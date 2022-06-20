@@ -303,3 +303,4 @@ TSWLatexianTemp*
 /data/
 /model/
 /.idea/
+/code/__pycache__/

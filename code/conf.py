@@ -29,5 +29,5 @@ def stft_routine(wav):
 
 
 def istft_routine(mag, phase):
-    spec = mag * np.exp(phase * 1j).T
+    spec = (mag * np.exp(phase * 1j)).T
     return librosa.istft(spec, n_fft=4096, hop_length=1024, window="hann", center=True)

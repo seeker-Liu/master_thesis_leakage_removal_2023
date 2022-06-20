@@ -8,7 +8,6 @@ def get_dataset(t: str, use_spectrogram):
     """
     :param t:  "train", "validation" or "test'
     :param use_spectrogram: Use spectrogram or not.
-    :param epoch:  Positive int or None, None means repeat indefinitely
     :return: Required datasets.
     """
     dataset = tf.data.Dataset.list_files(os.path.join(DATA_DIR, t, "*.npz"))

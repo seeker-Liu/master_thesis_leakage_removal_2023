@@ -3,21 +3,46 @@ from conf import *
 import tf_dataset
 import tf_model
 import tensorflow as tf
+import sys
 
 if __name__ == "__main__":
+    no_gpu = False
+    continue_train = False
+    for arg in sys.argv[1:]:
+        if arg == "-no-gpu":
+            no_gpu = True
+        if arg == "-continue":
+            continue_train = True
+
+    if no_gpu:
+        tf.config.set_visible_devices([], 'GPU')
+
     def avg_mse(y_true, y_pred):
         return (y_true - y_pred) * (y_true - y_pred) / tf.cast(tf.shape(y_true)[1], tf.float32)
 
-    model = tf_model.get_model()
+    if continue_train:
+        ckpt_folder = os.path.join(MODEL_DIR, "checkpoint")
+        last_model_path = os.listdir(ckpt_folder)[-1]
+        model = tf.keras.models.load_model(os.path.join(ckpt_folder, last_model_path),
+                                           custom_objects={"avg_mse": avg_mse})
+    else:
+        model = tf_model.get_model()
+        optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-4)
+        model.compile(optimizer=optimizer,
+                      metrics=[avg_mse],
+                      loss="mse")
+
     train_dataset = tf_dataset.get_dataset("train", True)
     valid_dataset = tf_dataset.get_dataset("validation", True)
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-4)
-    model.compile(optimizer=optimizer,
-                  metrics=[avg_mse],
-                  loss="mse")
     history = model.fit(train_dataset, epochs=100, validation_data=valid_dataset,
                         callbacks=(tf.keras.callbacks.TerminateOnNaN(),
-                                   tf.keras.callbacks.EarlyStopping()
+                                   # tf.keras.callbacks.EarlyStopping(verbose=1)
+                                   tf.keras.callbacks.ModelCheckpoint(
+                                       os.path.join(MODEL_DIR, "checkpoint", "model_{epoch:03d}"),
+                                       save_weights_only=False,
+                                       save_best_only=False,
+                                       verbose=1
+                                   )
                                    ))
 
     model.save(os.path.join(MODEL_DIR, "trained_model"))
