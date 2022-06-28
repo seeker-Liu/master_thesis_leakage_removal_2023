@@ -16,14 +16,15 @@ def get_dataset(t: str, use_spectrogram):
     if use_spectrogram:
         def dataset_mapper(filepath):
             data = np.load(filepath)
-            return np.hstack((data["input_mag"], data["ref_mag"])), data["truth_mag"]
+            return data["input_mag"], data["ref_mag"], data["truth_mag"]
     else:
         def dataset_mapper(filepath):
             data = np.load(filepath)
-            return np.vstack((data["input"], data["ref"])), data["truth"]
+            return data["input"], data["ref"], data["truth"]
 
     def dataset_mapper_wrapper(filepath):
-        return tf.numpy_function(dataset_mapper, [filepath], (tf.float32, tf.float32))
+        x1, x2, y = tf.numpy_function(dataset_mapper, [filepath], (tf.float32, tf.float32, tf.float32))
+        return (x1, x2), y
 
     dataset = dataset.map(dataset_mapper_wrapper).batch(1)
     return dataset

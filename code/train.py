@@ -13,9 +13,14 @@ if __name__ == "__main__":
             no_gpu = True
         if arg == "-continue":
             continue_train = True
+        else:
+            print(f"Unknown arg: {arg}")
 
     if no_gpu:
         tf.config.set_visible_devices([], 'GPU')
+    else:
+        physical_devices = tf.config.list_physical_devices('GPU')
+        tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
     def avg_mse(y_true, y_pred):
         return (y_true - y_pred) * (y_true - y_pred) / tf.cast(tf.shape(y_true)[1], tf.float32)

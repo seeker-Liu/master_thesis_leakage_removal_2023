@@ -29,7 +29,7 @@ def extract_audios(src_path, target_dir):
     soundfile.write(os.path.join(target_dir, "mixed_input.wav"), data["input"], SR)
 
 
-for i in range(5):
+for i in range(13):
     sync_dir = os.path.join(SYNC_DIR, str(i))
     real_dir = os.path.join(REAL_DIR, str(i))
     try:

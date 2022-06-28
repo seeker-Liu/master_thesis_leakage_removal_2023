@@ -13,23 +13,28 @@ if __name__ == "__main__":
             no_gpu = True
     if no_gpu:
         tf.config.set_visible_devices([], 'GPU')
+    else:
+        physical_devices = tf.config.list_physical_devices('GPU')
+        tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
     data_files = [os.path.join(TEST_DIR, np_f) for np_f in os.listdir(TEST_DIR)]
 
     def avg_mse(y_true, y_pred):
         return (y_true - y_pred) * (y_true - y_pred) / tf.cast(tf.shape(y_true)[1], tf.float32)
     ckpt_folder = os.path.join(MODEL_DIR, "checkpoint")
-    last_model_path = os.listdir(ckpt_folder)[-1]
-    model = tf.keras.models.load_model(os.path.join(ckpt_folder, last_model_path),
-                                       custom_objects={"avg_mse": avg_mse})
+    last_model_name = sorted(os.listdir(ckpt_folder))[-1]
+    model_path = os.path.join(ckpt_folder, last_model_name)
+    print(f"Model path: {model_path}")
+    model = tf.keras.models.load_model(model_path, custom_objects={"avg_mse": avg_mse})
 
     for i, path in enumerate(data_files):
         print(f"{i}-th input, path: {path}")
 
         data = np.load(path)
 
-        input_mag = np.expand_dims(np.hstack((data["input_mag"], data["ref_mag"])), axis=0)
-        res_mag = np.squeeze(model(input_mag, training=False).numpy(), axis=0)
+        input_mag = np.expand_dims(data["input_mag"], axis=0)
+        ref_mag = np.expand_dims(data["ref_mag"], axis=0)
+        res_mag = np.squeeze(model((input_mag, ref_mag), training=False).numpy(), axis=0)
         print(f"MSE value of spectrogram: {np.sum((res_mag - data['truth_mag']) ** 2) / res_mag.shape[0]}")
 
         result_wav = istft_routine(res_mag, data["input_phase"]).copy()
