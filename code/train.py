@@ -32,7 +32,7 @@ if __name__ == "__main__":
                                            custom_objects={"avg_mse": avg_mse})
     else:
         model = tf_model.get_model()
-        optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-4)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
         model.compile(optimizer=optimizer,
                       metrics=[avg_mse],
                       loss="mse")
