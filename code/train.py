@@ -37,18 +37,22 @@ if __name__ == "__main__":
                       metrics=[avg_mse],
                       loss="mse")
 
+    try:
+        os.mkdir(CHECKPOINT_DIR)
+    except FileExistsError:
+        pass
     train_dataset = tf_dataset.get_dataset("train", True)
     valid_dataset = tf_dataset.get_dataset("validation", True)
     history = model.fit(train_dataset, epochs=100, validation_data=valid_dataset,
                         callbacks=(tf.keras.callbacks.TerminateOnNaN(),
-                                   # tf.keras.callbacks.EarlyStopping(verbose=1)
+                                   tf.keras.callbacks.EarlyStopping(patience=1, min_delta=1e-5, verbose=1),
                                    tf.keras.callbacks.ModelCheckpoint(
-                                       os.path.join(MODEL_DIR, "checkpoint", "model_{epoch:03d}"),
+                                       os.path.join(CHECKPOINT_DIR, "model_{epoch:03d}"),
                                        save_weights_only=False,
                                        save_best_only=False,
                                        verbose=1
-                                   )
                                    ))
+                        )
 
     model.save(os.path.join(MODEL_DIR, "trained_model"))
     print(history.history)

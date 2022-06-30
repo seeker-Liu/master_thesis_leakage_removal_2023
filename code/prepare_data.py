@@ -35,6 +35,11 @@ def get_sync_list() -> list:
                 midi_path = os.path.join(urmp_dir, piece, f"Sco_{piece}.mid")
                 ans.append({"truth": (midi_path, vn_c, VIOLIN_PROGRAM_NUM),
                             "leak": (midi_path, cl_c, CLARINET_PROGRAM_NUM)})
+            if piece_num in URMP_VIOLIN_FLUTE_PIECE:
+                vn_c, fl_c = URMP_VIOLIN_FLUTE_PIECE[piece_num]
+                midi_path = os.path.join(urmp_dir, piece, f"Sco_{piece}.mid")
+                ans.append({"truth": (midi_path, vn_c, VIOLIN_PROGRAM_NUM),
+                            "leak": (midi_path, fl_c, FLUTE_PROGRAM_NUM)})
     return ans
 
 
@@ -72,9 +77,14 @@ def get_test_list() -> list:
             piece_name = piece.split('_')[1]
             if piece_num in URMP_VIOLIN_CLARINET_PIECES:
                 vn_c, cl_c = URMP_VIOLIN_CLARINET_PIECES[piece_num]
-                violin_path = os.path.join(urmp_dir, piece, f"AuSep_{vn_c+1}_vn_{piece_num}_{piece_name}.wav")
-                clarinet_path = os.path.join(urmp_dir, piece, f"AuSep_{cl_c+1}_cl_{piece_num}_{piece_name}.wav")
+                violin_path = os.path.join(urmp_dir, piece, f"AuSep_{vn_c+1}_vn_{piece_num:02}_{piece_name}.wav")
+                clarinet_path = os.path.join(urmp_dir, piece, f"AuSep_{cl_c+1}_cl_{piece_num:02}_{piece_name}.wav")
                 ans.append({"truth": (violin_path, None, None), "leak": (clarinet_path, None, None)})
+            if piece_num in URMP_VIOLIN_FLUTE_PIECE:
+                vn_c, fl_c = URMP_VIOLIN_FLUTE_PIECE[piece_num]
+                violin_path = os.path.join(urmp_dir, piece, f"AuSep_{vn_c+1}_vn_{piece_num:02}_{piece_name}.wav")
+                flute_path = os.path.join(urmp_dir, piece, f"AuSep_{fl_c+1}_fl_{piece_num:02}_{piece_name}.wav")
+                ans.append({"truth": (violin_path, None, None), "leak": (flute_path, None, None)})
 
     random.shuffle(ans)
     return ans
@@ -82,7 +92,7 @@ def get_test_list() -> list:
 
 def get_ir_list() -> list:
     ans = []
-    aec_challenge_dir = os.path.join(DATASET_DIR, "AEC_challenge", "Mobile")
+    aec_challenge_dir = os.path.join(DATASET_DIR, "ACE_challenge", "Mobile")
     for place in os.listdir(aec_challenge_dir):
         data_dir = os.path.join(aec_challenge_dir, place, "1")
         data_path = os.path.join(data_dir, os.listdir(data_dir)[0])
@@ -136,6 +146,7 @@ def add_reverb(audio, ir):
 
 def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> dict[str: np.array]:
     temp = {}
+    ans = {}
     for t, src in src_info.items():
         # t == "truth" or "leak"
         path, channel, program = src
@@ -144,8 +155,7 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> dict[str
         else:
             audio = load_audio(path)
         temp[t] = audio
-
-    ans = {}
+        ans[t + "_path"] = path
 
     ir = random.choice(IRs)
 
@@ -158,7 +168,7 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> dict[str
     temp["truth"] = add_reverb(temp["truth"], ir)
     ans["truth"] = temp["truth"].copy()
     ans["ref"] = temp["leak"].copy()
-    ans["ref"].resize(ans["truth"].shape)  # Ref is not conv'ed so is slightly shorted, compensate that.
+    ans["ref"].resize(ans["truth"].shape)  # Ref is not conv'ed so is slightly shorter, compensate that.
     temp["leak"] = add_reverb(temp["leak"], ir)
 
     ans["input"] = (temp["leak"] + temp["truth"]) * 0.5

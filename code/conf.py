@@ -10,6 +10,7 @@ TRAIN_DIR = os.path.join(DATA_DIR, "train")
 VALID_DIR = os.path.join(DATA_DIR, "validation")
 TEST_DIR = os.path.join(DATA_DIR, "test")
 MODEL_DIR = os.path.join(ROOT_DIR, "model")
+CHECKPOINT_DIR = os.path.join(MODEL_DIR, "checkpoint")
 
 SR = 44100
 
@@ -21,6 +22,7 @@ URMP_VIOLIN_FLUTE_PIECE = {8: (1, 0), 17: (0, 1), 18: (0, 1), 37: (1, 0)}
 
 VIOLIN_PROGRAM_NUM = 40
 CLARINET_PROGRAM_NUM = 71
+FLUTE_PROGRAM_NUM = 73
 
 
 def stft_routine(wav):
