@@ -43,12 +43,13 @@ if __name__ == "__main__":
 
         result_wav = istft_routine(res_mag, data["input_phase"]).copy()
         truth_wav = data["truth"]
+        leak_wav = data["leak"]
         result_wav.resize(truth_wav.shape)
 
         def get_metric(wav):
             sdr, sir, sar, _ = mir_eval.separation.bss_eval_sources(
-                np.vstack((truth_wav, data["input"] * 2 - data["truth"])),
-                np.vstack((wav, data["input"] * 2 - result_wav))
+                np.vstack((truth_wav, leak_wav)),
+                np.vstack((wav, data["input"] * 2 - wav))
             )
             return sdr[0], sir[0], sar[0]
         sdr, sir, sar = get_metric(result_wav)

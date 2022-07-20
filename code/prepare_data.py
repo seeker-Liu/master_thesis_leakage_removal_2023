@@ -86,7 +86,6 @@ def get_test_list() -> list:
                 flute_path = os.path.join(urmp_dir, piece, f"AuSep_{fl_c+1}_fl_{piece_num:02}_{piece_name}.wav")
                 ans.append({"truth": (violin_path, None, None), "leak": (flute_path, None, None)})
 
-    random.shuffle(ans)
     return ans
 
 
@@ -170,6 +169,7 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> dict[str
     ans["ref"] = temp["leak"].copy()
     ans["ref"].resize(ans["truth"].shape)  # Ref is not conv'ed so is slightly shorter, compensate that.
     temp["leak"] = add_reverb(temp["leak"], ir)
+    ans["leak"] = temp["leak"]
 
     ans["input"] = (temp["leak"] + temp["truth"]) * 0.5
 
