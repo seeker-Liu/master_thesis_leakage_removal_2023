@@ -10,9 +10,6 @@ import pretty_midi
 import librosa
 import soundfile
 
-# This 3 functions gives a list of pairs of midi or audio files.
-# Modify them to add/remove/modify data sources.
-
 
 def get_sync_list() -> list:
     ans = []
@@ -41,6 +38,9 @@ def get_sync_list() -> list:
                 ans.append({"truth": (midi_path, vn_c, VIOLIN_PROGRAM_NUM),
                             "leak": (midi_path, fl_c, FLUTE_PROGRAM_NUM)})
     return ans
+
+# These 3 functions gives a list of pairs of midi or audio files.
+# Modify them to add/remove/modify data sources.
 
 
 def get_train_list() -> list:
@@ -112,7 +112,7 @@ def get_data_list(data_type) -> list:
 
 
 def shake_midi(midi_channel: pretty_midi.Instrument):
-    # Shake the onsets of notes to simulate unstable performance from students.
+    # Shake the onsets of notes to simulate unstable performance from learners.
     # TODO
     return midi_channel
 
@@ -143,18 +143,17 @@ def add_reverb(audio, ir):
     return audio
 
 
-def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> dict[str: np.array]:
+def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> list[dict[str: np.array]]:
     temp = {}
     ans = {}
     for t, src in src_info.items():
         # t == "truth" or "leak"
         path, channel, program = src
         if os.path.splitext(path)[1].startswith(".mid"):
-            audio = sync_midi(path, channel, program)
+            temp[t] = sync_midi(path, channel, program)
         else:
-            audio = load_audio(path)
-        temp[t] = audio
-        ans[t + "_path"] = path
+            temp[t] = load_audio(path)
+        temp[t + "_path"] = path
 
     ir = random.choice(IRs)
 
@@ -165,36 +164,71 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> dict[str
         temp["truth"].resize(temp["leak"].shape, refcheck=False)
 
     temp["truth"] = add_reverb(temp["truth"], ir)
-    ans["truth"] = temp["truth"].copy()
-    ans["ref"] = temp["leak"].copy()
-    ans["ref"].resize(ans["truth"].shape)  # Ref is not conv'ed so is slightly shorter, compensate that.
-    temp["leak"] = add_reverb(temp["leak"], ir)
-    ans["leak"] = temp["leak"]
+    temp["leak_convoluted"] = add_reverb(temp["leak"], ir)
+    temp["leak"] = np.resize(temp["leak"], temp["truth"].size)
+    # leak is not conv'ed so is slightly shorter, compensate that.
 
-    ans["input"] = (temp["leak"] + temp["truth"]) * 0.5
+    if SAVE_16K:
+        temp["truth_16k"] = librosa.resample(temp["truth"], orig_sr=SR, target_sr=16000)
+        temp["leak_16k"] = librosa.resample(temp["leak"], orig_sr=SR, target_sr=16000)
+        temp["leak_convoluted_16k"] = librosa.resample(temp["leak_convoluted"], orig_sr=SR, target_sr=16000)
 
-    if SAVE_SPECTOGRAM:
-        for t in ["truth", "ref", "input"]:
-            ans[t+"_mag"], ans[t+"_phase"] = stft_routine(ans[t])
+    answers = []
+    for i in range(0, temp["truth"].size // SR - AUDIO_CLIP_HOP, AUDIO_CLIP_HOP):
+        ans = {"truth_path": temp["truth_path"], "leak_path": temp["leak_path"], "starting_seconds": i}
 
-    if not SAVE_AUDIO:
-        ans.pop("truth")
-        ans.pop("leak")
-        ans.pop("truth")
+        def save_content(sr, sr_str):
+            index_range = slice(i * sr, (i + AUDIO_CLIP_LENGTH) * sr)
+            ans["truth" + sr_str] = temp["truth" + sr_str][index_range].copy()
+            ans["ref" + sr_str] = temp["leak" + sr_str][index_range].copy()
+            ans["leak" + sr_str] = temp["leak_convoluted" + sr_str][index_range].copy()
 
-    return ans
+            # Zero-padding if audio clip is shorter than AUDIO_CLIP_LENGTH seconds
+            ans["truth" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
+            ans["ref" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
+            ans["leak" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
+
+            ans["input" + sr_str] = (ans["leak" + sr_str] + ans["truth" + sr_str]) * 0.5
+
+            if SAVE_SPECTOGRAM:
+                for t in ["truth", "ref", "input"]:
+                    ans[t + "_mag" + sr_str], ans[t + "_phase" + sr_str] = stft_routine(ans[t + sr_str], sr)
+
+            if not SAVE_AUDIO:
+                ans.pop("truth" + sr_str)
+                ans.pop("leak" + sr_str)
+                ans.pop("truth" + sr_str)
+
+        save_content(SR, "")
+        if SAVE_16K:
+            save_content(16000, "_16k")
+        answers.append(ans)
+
+    return answers
 
 
 if __name__ == '__main__':
-    try:
-        DEBUG = int(sys.argv[1]) > 0
-    except (IndexError, ValueError):
-        DEBUG = False
-
-    # Set paths
     TYPES = ["train", "valid", "test"]
     DIRS = [TRAIN_DIR, VALID_DIR, TEST_DIR]
     DIRS = {x: y for x, y in zip(TYPES, DIRS)}
+
+    DEBUG = False
+    targets = []
+    for arg in sys.argv[1: ]:
+        if arg == "--debug":
+            DEBUG = True
+        elif arg == "--all":
+            targets += TYPES
+        elif arg == "--train":
+            targets.append("train")
+        elif arg == "--valid":
+            targets.append("valid")
+        elif arg == "--test":
+            targets.append("test")
+        else:
+            print(f"Unknown option: {arg}")
+    DIRS = {k: v for k, v in DIRS.items() if k in targets}
+    del targets
 
     # Clean dirs
     for d in DIRS.values():
@@ -208,15 +242,18 @@ if __name__ == '__main__':
     IRs = [load_audio(ir) for ir in get_ir_list()]
 
     # Actually synth
-    for t in TYPES:
+    for t in DIRS.keys():
         print(f"Preparing {t} data")
+        j = 0
         data_list = get_data_list(t)
         for i, info in enumerate(data_list):
             if i % 10 == 0:
                 print(f"{i} / {len(data_list)}")
-            audio = sync_audio(t, info)
-            out_path = os.path.join(DIRS[t], f"{i:06}.npz")
-            np.savez(out_path, **audio)
-            if DEBUG:
-                for k, v in audio.items():
-                    soundfile.write(os.path.join(DATA_DIR, k + "-test.wav"), v, SR)
+            audios = sync_audio(t, info)
+            for audio in audios:
+                out_path = os.path.join(DIRS[t], f"{j:06}.npz")
+                j += 1
+                np.savez(out_path, **audio)
+                if DEBUG:
+                    for k, v in audio.items():
+                        soundfile.write(os.path.join(DATA_DIR, k + "-test.wav"), v, SR)
