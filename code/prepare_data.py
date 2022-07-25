@@ -39,6 +39,7 @@ def get_sync_list() -> list:
                             "leak": (midi_path, fl_c, FLUTE_PROGRAM_NUM)})
     return ans
 
+
 # These 3 functions gives a list of pairs of midi or audio files.
 # Modify them to add/remove/modify data sources.
 
@@ -77,25 +78,14 @@ def get_test_list() -> list:
             piece_name = piece.split('_')[1]
             if piece_num in URMP_VIOLIN_CLARINET_PIECES:
                 vn_c, cl_c = URMP_VIOLIN_CLARINET_PIECES[piece_num]
-                violin_path = os.path.join(urmp_dir, piece, f"AuSep_{vn_c+1}_vn_{piece_num:02}_{piece_name}.wav")
-                clarinet_path = os.path.join(urmp_dir, piece, f"AuSep_{cl_c+1}_cl_{piece_num:02}_{piece_name}.wav")
+                violin_path = os.path.join(urmp_dir, piece, f"AuSep_{vn_c + 1}_vn_{piece_num:02}_{piece_name}.wav")
+                clarinet_path = os.path.join(urmp_dir, piece, f"AuSep_{cl_c + 1}_cl_{piece_num:02}_{piece_name}.wav")
                 ans.append({"truth": (violin_path, None, None), "leak": (clarinet_path, None, None)})
             if piece_num in URMP_VIOLIN_FLUTE_PIECE:
                 vn_c, fl_c = URMP_VIOLIN_FLUTE_PIECE[piece_num]
-                violin_path = os.path.join(urmp_dir, piece, f"AuSep_{vn_c+1}_vn_{piece_num:02}_{piece_name}.wav")
-                flute_path = os.path.join(urmp_dir, piece, f"AuSep_{fl_c+1}_fl_{piece_num:02}_{piece_name}.wav")
+                violin_path = os.path.join(urmp_dir, piece, f"AuSep_{vn_c + 1}_vn_{piece_num:02}_{piece_name}.wav")
+                flute_path = os.path.join(urmp_dir, piece, f"AuSep_{fl_c + 1}_fl_{piece_num:02}_{piece_name}.wav")
                 ans.append({"truth": (violin_path, None, None), "leak": (flute_path, None, None)})
-
-    return ans
-
-
-def get_ir_list() -> list:
-    ans = []
-    aec_challenge_dir = os.path.join(DATASET_DIR, "ACE_challenge", "Mobile")
-    for place in os.listdir(aec_challenge_dir):
-        data_dir = os.path.join(aec_challenge_dir, place, "1")
-        data_path = os.path.join(data_dir, os.listdir(data_dir)[0])
-        ans.append(data_path)
 
     return ans
 
@@ -109,6 +99,46 @@ def get_data_list(data_type) -> list:
         return get_test_list()
     else:
         raise ValueError("Unknown data type")
+
+
+def get_ir_list() -> list:
+    ans = []
+    aec_challenge_dir = os.path.join(DATASET_DIR, "ACE_challenge", "Mobile")
+    for place in os.listdir(aec_challenge_dir):
+        data_dir = os.path.join(aec_challenge_dir, place, "1")
+        data_path = os.path.join(data_dir, os.listdir(data_dir)[0])
+        ans.append(data_path)
+
+    return ans
+
+
+def get_noise_list() -> list:
+    ans = []
+    openslr_noise_dir = os.path.join(DATASET_DIR, "OpenSLR-RIR-Noises", "pointsource_noises")
+    with open(os.path.join(openslr_noise_dir, "ANNOTATIONS"), "r", encoding="utf-8") as notation_f:
+        for line in notation_f.readlines()[1:]:
+            ans.append(os.path.join(openslr_noise_dir, line.rstrip('\n') + ".wav"))
+    return ans
+
+
+def get_random_snr():
+    snr_values = [-6, -3, 0, 3, 6]
+    return random.choice(snr_values)
+
+
+def get_random_noise_snr():
+    return random.random() * -12 + -3  # [-15, 3] dB
+
+
+def mix_on_given_snr(snr, signal, noise):
+    signal_energy = np.mean(signal ** 2)
+    noise_energy = np.mean(noise ** 2)
+
+    g = np.sqrt(10.0 ** (-snr / 10) * signal_energy / noise_energy)
+    a = np.sqrt(1 / (1 + g ** 2))
+    b = np.sqrt(g ** 2 / (1 + g ** 2))
+
+    return a * signal + b * noise
 
 
 def shake_midi(midi_channel: pretty_midi.Instrument):
@@ -175,7 +205,17 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> list[dic
 
     answers = []
     for i in range(0, temp["truth"].size // SR - AUDIO_CLIP_HOP, AUDIO_CLIP_HOP):
-        ans = {"truth_path": temp["truth_path"], "leak_path": temp["leak_path"], "starting_seconds": i}
+        # Public information shared among different sample rate and stft configs.
+        ans = {"truth_path": temp["truth_path"], "leak_path": temp["leak_path"], "starting_seconds": i,
+               "snr": get_random_snr()}
+        if ADD_NOISE:
+            noise = random.choice(noises)
+            # Randomly select a 10s continuous fragment
+            noise_fragment_index = random.randrange(0, len(noise) - AUDIO_CLIP_LENGTH * SR)
+            ans["noise"] = noise[noise_fragment_index: noise_fragment_index + AUDIO_CLIP_LENGTH * SR].copy()
+            if SAVE_16K:
+                ans["noise_16k"] = librosa.resample(ans["noise"], orig_sr=44100, target_sr=16000)
+            ans["noise_snr"] = get_random_noise_snr()
 
         def save_content(sr, sr_str):
             index_range = slice(i * sr, (i + AUDIO_CLIP_LENGTH) * sr)
@@ -188,9 +228,11 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> list[dic
             ans["ref" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
             ans["leak" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
 
-            ans["input" + sr_str] = (ans["leak" + sr_str] + ans["truth" + sr_str]) * 0.5
+            ans["input" + sr_str] = mix_on_given_snr(ans["snr"], ans["truth" + sr_str], ans["leak" + sr_str])
+            if ADD_NOISE:
+                ans["input" + sr_str] = mix_on_given_snr(ans["noise_snr"], ans["input" + sr_str], ans["noise" + sr_str])
 
-            if SAVE_SPECTOGRAM:
+            if SAVE_SPECTROGRAM:
                 for t in ["truth", "ref", "input"]:
                     ans[t + "_mag" + sr_str], ans[t + "_phase" + sr_str] = stft_routine(ans[t + sr_str], sr)
 
@@ -214,7 +256,7 @@ if __name__ == '__main__':
 
     DEBUG = False
     targets = []
-    for arg in sys.argv[1: ]:
+    for arg in sys.argv[1:]:
         if arg == "--debug":
             DEBUG = True
         elif arg == "--all":
@@ -239,7 +281,13 @@ if __name__ == '__main__':
         os.mkdir(d)
 
     # Set-up IRs
+    print("Setting up IRs' data")
     IRs = [load_audio(ir) for ir in get_ir_list()]
+
+    # Set-up noises
+    print("Setting up noises' data")
+    noises = [load_audio(noise) for noise in get_noise_list()]
+    noises = [noise for noise in noises if len(noise) >= AUDIO_CLIP_LENGTH * SR]
 
     # Actually synth
     for t in DIRS.keys():

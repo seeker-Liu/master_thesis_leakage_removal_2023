@@ -20,14 +20,14 @@ if __name__ == "__main__":
 
     data_files = [os.path.join(TEST_DIR, np_f) for np_f in os.listdir(TEST_DIR)]
 
-    def avg_mse(y_true, y_pred):
-        return (y_true - y_pred) * (y_true - y_pred) / tf.cast(tf.shape(y_true)[1], tf.float32)
     ckpt_folder = os.path.join(MODEL_DIR, "checkpoint")
     last_model_name = sorted(os.listdir(ckpt_folder))[-1]
     model_path = os.path.join(ckpt_folder, last_model_name)
     print(f"Model path: {model_path}")
-    model = tf.keras.models.load_model(model_path, custom_objects={"avg_mse": avg_mse})
+    model = tf.keras.models.load_model(model_path)
 
+    baseline_sdrs = []
+    algo_sdrs = []
     for i, path in enumerate(data_files):
         print()
         print(f"{i}-th input:")
@@ -36,12 +36,13 @@ if __name__ == "__main__":
         data = np.load(path)
         print(f"Leakage audio path: {data['leak_path']}")
         print(f"Target audio path: {data['truth_path']}")
+        print(f"Starting point: {data['starting_seconds']}")
 
         input_mag = np.expand_dims(data["input_mag"], axis=0)
         ref_mag = np.expand_dims(data["ref_mag"], axis=0)
         res_mag = np.squeeze(model((input_mag, ref_mag), training=False).numpy(), axis=0)
 
-        result_wav = istft_routine(res_mag, data["input_phase"]).copy()
+        result_wav = istft_routine(res_mag, data["input_phase"], SR).copy()
         truth_wav = data["truth"]
         leak_wav = data["leak"]
         result_wav.resize(truth_wav.shape)
@@ -53,11 +54,13 @@ if __name__ == "__main__":
             )
             return sdr[0], sir[0], sar[0]
         sdr, sir, sar = get_metric(result_wav)
+        algo_sdrs.append(sdr)
         print(f"Result metrics: SDR: {sdr:.5f}, SIR: {sir:.5f}, SAR: {sar:.5f}")
-        baseline_wav = istft_routine(data["input_mag"] * 2 - data["ref_mag"], data["input_phase"]).copy()
+        baseline_wav = istft_routine(data["input_mag"] * 2 - data["ref_mag"], data["input_phase"], SR).copy()
         baseline_wav.resize(truth_wav.shape)
         sdr, sir, sar = get_metric(baseline_wav)
         print(f"Baseline metrics: SDR: {sdr:.5f}, SIR: {sir:.5f}, SAR: {sar:.5f}")
+        baseline_sdrs.append(sdr)
 
         output_dir = os.path.join(MODEL_DIR, "test_output")
         try:
@@ -81,5 +84,6 @@ if __name__ == "__main__":
         soundfile.write(os.path.join(output_dir, data_no + "_baseline.wav"),
                         baseline_wav, SR)
 
+    print(f"Average SDR: proposed algo: {np.mean(algo_sdrs)}, baseline: {np.mean(baseline_sdrs)}")
 
 

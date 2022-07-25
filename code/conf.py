@@ -15,8 +15,9 @@ CHECKPOINT_DIR = os.path.join(MODEL_DIR, "checkpoint")
 SR = 44100
 
 SAVE_AUDIO = True
-SAVE_SPECTOGRAM = False
+SAVE_SPECTROGRAM = True
 SAVE_16K = True
+ADD_NOISE = True
 
 URMP_VIOLIN_CLARINET_PIECES = {17: (0, 2), 19: (1, 0), 37: (1, 3)}
 URMP_VIOLIN_FLUTE_PIECE = {8: (1, 0), 17: (0, 1), 18: (0, 1), 37: (1, 0)}
@@ -28,6 +29,8 @@ FLUTE_PROGRAM_NUM = 73
 # Length of each clip for training/evaluating, in seconds
 AUDIO_CLIP_LENGTH = 10
 AUDIO_CLIP_HOP = 5
+BATCH_SIZE = 16
+LEARNING_RATE = 1e-4
 
 
 STFT_16K_PARAMS = {"n_fft": 512, "hop_length": 256, "window": "hann", "center": True}
@@ -40,7 +43,7 @@ def stft_routine(wav, sr):
     return np.abs(spec), np.angle(spec)
 
 
-def istft_routine(mag, phase, sr=SR):
+def istft_routine(mag, phase, sr):
     params = STFT_44K_PARAMS if sr == SR else STFT_16K_PARAMS
     spec = (mag * np.exp(phase * 1j)).T
     return librosa.istft(spec, **params)

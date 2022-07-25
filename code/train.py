@@ -22,27 +22,22 @@ if __name__ == "__main__":
         physical_devices = tf.config.list_physical_devices('GPU')
         tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
-    def avg_mse(y_true, y_pred):
-        return (y_true - y_pred) * (y_true - y_pred) / tf.cast(tf.shape(y_true)[1], tf.float32)
-
     if continue_train:
         ckpt_folder = os.path.join(MODEL_DIR, "checkpoint")
         last_model_path = os.listdir(ckpt_folder)[-1]
-        model = tf.keras.models.load_model(os.path.join(ckpt_folder, last_model_path),
-                                           custom_objects={"avg_mse": avg_mse})
+        model = tf.keras.models.load_model(os.path.join(ckpt_folder, last_model_path))
     else:
         model = tf_model.get_model()
-        optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE)
         model.compile(optimizer=optimizer,
-                      metrics=[avg_mse],
                       loss="mse")
 
     try:
         os.mkdir(CHECKPOINT_DIR)
     except FileExistsError:
         pass
-    train_dataset = tf_dataset.get_dataset("train", True)
-    valid_dataset = tf_dataset.get_dataset("validation", True)
+    train_dataset = tf_dataset.get_dataset("train", True, SR, "")
+    valid_dataset = tf_dataset.get_dataset("validation", True, SR, "")
     history = model.fit(train_dataset, epochs=100, validation_data=valid_dataset,
                         callbacks=(tf.keras.callbacks.TerminateOnNaN(),
                                    tf.keras.callbacks.EarlyStopping(patience=1, min_delta=1e-5, verbose=1),
