@@ -1,13 +1,15 @@
 from conf import *
 
 import tensorflow as tf
+from baseline_model import build_ideal_mask
 import numpy as np
 
 
-def get_dataset(t: str, use_spectrogram, sr, sr_postfix_str):
+def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str):
     """
     :param t:  "train", "validation" or "test'
     :param use_spectrogram: Use spectrogram or not.
+    :param use_irm: Return Ideal Ratio Mask or not. Overwrite use_spectrogram
     :param sr sample rate used
     :param sr_postfix_str Postfix string of sr
     :return: Required datasets.
@@ -15,7 +17,20 @@ def get_dataset(t: str, use_spectrogram, sr, sr_postfix_str):
     dataset = tf.data.Dataset.list_files(os.path.join(DATA_DIR, t, "*.npz"))
     dataset = dataset.shuffle(buffer_size=10000, reshuffle_each_iteration=True)
 
-    if use_spectrogram:
+    if use_irm:
+        def dataset_mapper(filepath):
+            data = np.load(filepath)
+            input_mag = data["input_mag" + sr_postfix_str]
+            input_phase = data["input_phase" + sr_postfix_str]
+            ref_mag = data["ref_mag" + sr_postfix_str]
+            truth_mag = data["truth_mag" + sr_postfix_str]
+            truth_phase = data["truth_phase" + sr_postfix_str]
+            input_complex = input_mag * np.exp(input_phase * 1j)
+            truth_complex = truth_mag * np.exp(truth_phase * 1j)
+
+            return input_mag, ref_mag, build_ideal_mask(input_complex, truth_complex)
+
+    elif use_spectrogram:
         def dataset_mapper(filepath):
             data = np.load(filepath)
             if SAVE_SPECTROGRAM:
@@ -40,7 +55,14 @@ def get_dataset(t: str, use_spectrogram, sr, sr_postfix_str):
 
 
 if __name__ == "__main__":
-    ds = get_dataset("train", True, SR, "")
+    ds = get_dataset("train", True, False, SR, "")
     i = iter(ds)
-    d = next(i)
-    print(d)
+    x, y = next(i)
+    x1, x2 = x
+    print(x1.shape, x2.shape, y.shape)
+
+    ds = get_dataset("train", False, True, 16000, "_16k")
+    i = iter(ds)
+    x, y = next(i)
+    x1, x2 = x
+    print(x1.shape, x2.shape, y.shape)

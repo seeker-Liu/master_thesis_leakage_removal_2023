@@ -204,7 +204,9 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> list[dic
         temp["leak_convoluted_16k"] = librosa.resample(temp["leak_convoluted"], orig_sr=SR, target_sr=16000)
 
     answers = []
-    for i in range(0, temp["truth"].size // SR - AUDIO_CLIP_HOP, AUDIO_CLIP_HOP):
+    # for i in range(0, temp["truth"].size // SR - AUDIO_CLIP_HOP, AUDIO_CLIP_HOP):
+    i = 0
+    while i < temp["truth"].size / SR - AUDIO_CLIP_HOP:
         # Public information shared among different sample rate and stft configs.
         ans = {"truth_path": temp["truth_path"], "leak_path": temp["leak_path"], "starting_seconds": i,
                "snr": get_random_snr()}
@@ -218,7 +220,7 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> list[dic
             ans["noise_snr"] = get_random_noise_snr()
 
         def save_content(sr, sr_str):
-            index_range = slice(i * sr, (i + AUDIO_CLIP_LENGTH) * sr)
+            index_range = slice(int(i * sr), int((i + AUDIO_CLIP_LENGTH) * sr))
             ans["truth" + sr_str] = temp["truth" + sr_str][index_range].copy()
             ans["ref" + sr_str] = temp["leak" + sr_str][index_range].copy()
             ans["leak" + sr_str] = temp["leak_convoluted" + sr_str][index_range].copy()
@@ -245,6 +247,8 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> list[dic
         if SAVE_16K:
             save_content(16000, "_16k")
         answers.append(ans)
+
+        i += AUDIO_CLIP_HOP
 
     return answers
 
