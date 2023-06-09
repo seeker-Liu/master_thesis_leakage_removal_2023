@@ -37,23 +37,16 @@ def get_sync_list() -> list:
                 midi_path = os.path.join(urmp_dir, piece, f"Sco_{piece}.mid")
                 ans.append({"truth": (midi_path, vn_c, VIOLIN_PROGRAM_NUM),
                             "leak": (midi_path, fl_c, FLUTE_PROGRAM_NUM)})
-    return ans
 
+    mango_dir = os.path.join(DATASET_DIR, "MangoFuture", "midi")
+    for piece in os.listdir(mango_dir):
+        piece_path = os.path.join(mango_dir, piece)
+        if os.path.isdir(piece_path):
+            truth_midi_path = os.path.join(piece_path, "独奏乐谱_violin_0.midi")
+            leak_midi_path = os.path.join(piece_path, "伴奏乐谱_piano_0.midi")
+            ans.append({"truth": (truth_midi_path, 0, VIOLIN_PROGRAM_NUM),
+                        "leak": (leak_midi_path, 1, PIANO_PROGRAM_NUM)})
 
-# These 3 functions gives a list of pairs of midi or audio files.
-# Modify them to add/remove/modify data sources.
-
-
-def get_train_list() -> list:
-    ans = get_sync_list()
-    ans *= 10
-    random.shuffle(ans)
-    return ans
-
-
-def get_valid_list() -> list:
-    ans = get_sync_list()
-    random.shuffle(ans)
     return ans
 
 
@@ -90,15 +83,12 @@ def get_test_list() -> list:
     return ans
 
 
-def get_data_list(data_type) -> list:
-    if data_type == "train":
-        return get_train_list()
-    elif data_type == "valid":
-        return get_valid_list()
-    elif data_type == "test":
-        return get_test_list()
-    else:
-        raise ValueError("Unknown data type")
+def get_data_list() -> dict[str: list]:
+    sync_list = get_sync_list()
+    random.shuffle(sync_list)
+    return {"train": sync_list[len(sync_list) // 10:],
+            "valid": sync_list[:len(sync_list) // 10],
+            "test": get_test_list()}
 
 
 def get_ir_list() -> list:
@@ -127,7 +117,7 @@ def get_random_snr():
 
 
 def get_random_noise_snr():
-    return random.random() * -12 + -3  # [-15, 3] dB
+    return random.random() * -18 + 3  # [-15, 3] dB
 
 
 def mix_on_given_snr(snr, signal, noise):
@@ -173,7 +163,7 @@ def add_reverb(audio, ir):
     return audio
 
 
-def sync_audio(data_type: str, src_info: dict[str: tuple[str, int]]) -> list[dict[str: np.array]]:
+def sync_audio(data_type: str, src_info: dict[str: tuple[str, int, int]]) -> list[dict[str: np.array]]:
     temp = {}
     ans = {}
     for t, src in src_info.items():
@@ -294,10 +284,11 @@ if __name__ == '__main__':
     noises = [noise for noise in noises if len(noise) >= AUDIO_CLIP_LENGTH * SR]
 
     # Actually synth
+    data_lists = get_data_list()
     for t in DIRS.keys():
         print(f"Preparing {t} data")
         j = 0
-        data_list = get_data_list(t)
+        data_list = data_lists[t]
         for i, info in enumerate(data_list):
             if i % 10 == 0:
                 print(f"{i} / {len(data_list)}")
