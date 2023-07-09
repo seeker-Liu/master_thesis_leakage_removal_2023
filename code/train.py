@@ -5,18 +5,24 @@ import tf_model
 import baseline_model
 import tensorflow as tf
 import sys
+from wave_u_net.wave_u_net import wave_u_net
+from wave_u_net.wave_u_net_AEC import wave_u_net_aec
 
 if __name__ == "__main__":
     no_gpu = False
     continue_train = False
-    train_baseline = False
+    target = "original"  # "original", "baseline" or "wave-u-net"
     for arg in sys.argv[1:]:
         if arg == "-no-gpu":
             no_gpu = True
-        if arg == "-c" or arg == "-continue":
+        elif arg == "-c" or arg == "-continue":
             continue_train = True
-        if arg == "-b" or arg == "-baseline":
-            train_baseline = True
+        elif arg == "-b" or arg == "-baseline":
+            target = "baseline"
+        elif arg == "-wave-u-net":
+            target = "wave-u-net"
+        elif arg == "-wave-u-net-baseline":
+            target = "wave-u-net-baseline"
         else:
             print(f"Unknown arg: {arg}")
 
@@ -26,32 +32,66 @@ if __name__ == "__main__":
         physical_devices = tf.config.list_physical_devices('GPU')
         tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
-    model_dir = BASELINE_MODEL_DIR if train_baseline else MODEL_DIR
+    model_dir = {
+        "baseline": BASELINE_MODEL_DIR,
+        "original": MODEL_DIR,
+        "wave-u-net-baseline": WAVE_U_NET_BASELINE_MODEL_DIR,
+        "wave-u-net": WAVE_U_NET_MODEL_DIR
+    }[target]
+    ckpt_folder = os.path.join(model_dir, "checkpoint")
+    try:
+        os.mkdir(ckpt_folder)
+    except FileExistsError:
+        pass
+
     if continue_train:
-        ckpt_folder = os.path.join(model_dir, "checkpoint")
         last_model_path = os.listdir(ckpt_folder)[-1]
         model = tf.keras.models.load_model(os.path.join(ckpt_folder, last_model_path))
     else:
-        if train_baseline:
+        if target == "baseline":
             model = baseline_model.BaselineModel()
             optimizer = tf.keras.optimizers.Adam()
             model.compile(optimizer=optimizer,
                           loss="mse")
-        else:
+        elif target == "original":
             model = tf_model.get_model()
+            optimizer = tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE)
+            model.compile(optimizer=optimizer,
+                          loss="mse")
+        elif target == "wave-u-net" or target == "wave-u-net-baseline":
+            wave_u_net_params = {
+                "num_initial_filters": 24,
+                "num_layers": 12,
+                "kernel_size": 15,
+                "merge_filter_size": 5,
+                "source_names": ["target", "leaked"],
+                "num_channels": 1,
+                "output_filter_size": 1,
+                "padding": "valid",
+                "input_size": 44100 * 5,
+                "context": True,
+                "upsampling_type": "learned",  # "learned" or "linear"
+                "output_activation": "linear",  # "linear" or "tanh"
+                "output_type": "difference",  # "direct" or "difference"
+            }
+            model = wave_u_net(**wave_u_net_params) \
+                if target == "wave_u_net_baseline" else wave_u_net_aec(**wave_u_net_params)
             optimizer = tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE)
             model.compile(optimizer=optimizer,
                           loss="mse")
 
     try:
-        os.mkdir(CHECKPOINT_DIR)
+        os.mkdir(ckpt_folder)
     except FileExistsError:
         pass
 
-    dataset_param = {"use_spectrogram": not train_baseline,
-                     "use_irm": train_baseline,
-                     "sr": 16000 if train_baseline else SR,
-                     "sr_postfix_str": "_16k" if train_baseline else ""}
+    dataset_param = {
+        "use_spectrogram": target == "original",
+        "use_irm": target == "baseline",
+        "sr": 16000 if target == "baseline" else SR,
+        "sr_postfix_str": "_16k" if target == "baseline" else "",
+        "target_output_length": 86021 if target == "wave-u-net" else None
+    }
     train_dataset = tf_dataset.get_dataset("train", **dataset_param)
     valid_dataset = tf_dataset.get_dataset("validation", **dataset_param)
 
@@ -59,7 +99,7 @@ if __name__ == "__main__":
                         callbacks=(tf.keras.callbacks.TerminateOnNaN(),
                                    tf.keras.callbacks.EarlyStopping(patience=3, min_delta=1e-5, verbose=1),
                                    tf.keras.callbacks.ModelCheckpoint(
-                                       os.path.join(CHECKPOINT_DIR, "model_{epoch:03d}"),
+                                       os.path.join(ckpt_folder, "model_{epoch:03d}"),
                                        save_weights_only=False,
                                        save_best_only=False,
                                        verbose=1

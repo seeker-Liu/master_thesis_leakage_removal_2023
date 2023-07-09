@@ -11,7 +11,8 @@ VALID_DIR = os.path.join(DATA_DIR, "validation")
 TEST_DIR = os.path.join(DATA_DIR, "test")
 MODEL_DIR = os.path.join(ROOT_DIR, "model")
 BASELINE_MODEL_DIR = os.path.join(ROOT_DIR, "baseline_model")
-CHECKPOINT_DIR = os.path.join(MODEL_DIR, "checkpoint")
+WAVE_U_NET_MODEL_DIR = os.path.join(ROOT_DIR, "wave_u_net_model")
+WAVE_U_NET_BASELINE_MODEL_DIR = os.path.join(ROOT_DIR, "wave_u_net_baseline_model")
 
 SR = 44100
 
