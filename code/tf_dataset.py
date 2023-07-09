@@ -57,7 +57,7 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_out
         if use_irm or use_spectrogram:
             return (x1, x2), y
         else:
-            return (tf.expand_dims(x1, -1), tf.expand_dims(x2, -1t )), tf.expand_dims(y, -1)
+            return (tf.expand_dims(x1, -1), tf.expand_dims(x2, -1)), tf.expand_dims(y, -1)
 
     dataset = dataset.map(dataset_mapper_wrapper).batch(BATCH_SIZE)
     return dataset
