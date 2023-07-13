@@ -3,6 +3,7 @@ import os
 import shutil
 import numpy as np
 import soundfile
+import random
 
 SAMPLE_AUDIO_DIR = os.path.join(DATA_DIR, "sample_audios")
 try:
@@ -40,5 +41,5 @@ for i in range(13):
     os.mkdir(sync_dir)
     os.mkdir(real_dir)
 
-    extract_audios(os.path.join(DATA_DIR, "train", f"{i:06}.npz"), sync_dir)
-    extract_audios(os.path.join(DATA_DIR, "test", f"{i:06}.npz"), real_dir)
+    extract_audios(os.path.join(DATA_DIR, "train", f"{random.randint(0, 4000):06}.npz"), sync_dir)
+    extract_audios(os.path.join(DATA_DIR, "test", f"{random.randint(0, 400):06}.npz"), real_dir)
