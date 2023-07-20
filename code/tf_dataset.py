@@ -5,7 +5,8 @@ from baseline_model import build_ideal_mask
 import numpy as np
 
 
-def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_output_length):
+def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_output_length, batch_size=BATCH_SIZE,
+                single_input: bool = False):
     """
     :param t:  "train", "validation" or "test'
     :param use_spectrogram: Use spectrogram or not.
@@ -14,6 +15,8 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_out
     :param sr_postfix_str Postfix string of sr
     :param target_output_length Only meaningful to Wave-u-net model, wave-u-net model use a context setting and only
     the middle part is kept as prediction.
+    :param batch_size
+    :param single_input Return single input or not. Used for wave-u-net baseline model
     :return: Required datasets.
     """
     dataset = tf.data.Dataset.list_files(os.path.join(DATA_DIR, t, "*.npz"))
@@ -37,7 +40,7 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_out
             data = np.load(filepath)
             if SAVE_SPECTROGRAM:
                 return data["input_mag" + sr_postfix_str], \
-                       data["ref_mag" + sr_postfix_str], data["truth_mag" + sr_postfix_str]
+                    data["ref_mag" + sr_postfix_str], data["truth_mag" + sr_postfix_str]
             else:
                 input_mag = stft_routine(data["input" + sr_postfix_str], sr)
                 ref_mag = stft_routine(data["ref" + sr_postfix_str], sr)
@@ -52,14 +55,26 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_out
             return data["input" + sr_postfix_str], data["ref" + sr_postfix_str], \
                 data["truth" + sr_postfix_str][begin_idx:-end_idx]
 
-    def dataset_mapper_wrapper(filepath):
-        x1, x2, y = tf.numpy_function(dataset_mapper, [filepath], (tf.float32, tf.float32, tf.float32))
-        if use_irm or use_spectrogram:
-            return (x1, x2), y
+    if use_irm or use_spectrogram:
+        if single_input:
+            def dataset_mapper_wrapper(filepath):
+                x1, x2, y = tf.numpy_function(dataset_mapper, [filepath], (tf.float32, tf.float32, tf.float32))
+                return (x1,), y
         else:
-            return (tf.expand_dims(x1, -1), tf.expand_dims(x2, -1)), tf.expand_dims(y, -1)
+            def dataset_mapper_wrapper(filepath):
+                x1, x2, y = tf.numpy_function(dataset_mapper, [filepath], (tf.float32, tf.float32, tf.float32))
+                return (x1, x2), y
+    else:
+        if single_input:
+            def dataset_mapper_wrapper(filepath):
+                x1, x2, y = tf.numpy_function(dataset_mapper, [filepath], (tf.float32, tf.float32, tf.float32))
+                return (tf.expand_dims(x1, -1), ), tf.expand_dims(y, -1)
+        else:
+            def dataset_mapper_wrapper(filepath):
+                x1, x2, y = tf.numpy_function(dataset_mapper, [filepath], (tf.float32, tf.float32, tf.float32))
+                return (tf.expand_dims(x1, -1), tf.expand_dims(x2, -1)), tf.expand_dims(y, -1)
 
-    dataset = dataset.map(dataset_mapper_wrapper).batch(BATCH_SIZE)
+    dataset = dataset.map(dataset_mapper_wrapper).batch(batch_size)
     return dataset
 
 
