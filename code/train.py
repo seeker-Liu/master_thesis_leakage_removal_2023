@@ -89,15 +89,7 @@ if __name__ == "__main__":
     except FileExistsError:
         pass
 
-    dataset_param = {
-        "use_spectrogram": target == "original",
-        "use_irm": target == "baseline",
-        "sr": 16000 if target == "baseline" else SR,
-        "sr_postfix_str": "_16k" if target == "baseline" else "",
-        "target_output_length": 86021 if target == "wave-u-net" or target == "wave-u-net-baseline" else None,
-        "batch_size": BATCH_SIZE if target != "wave-u-net" and target != "wave-u-net-baseline" else 8,
-        "single_input": target == "wave-u-net-baseline"
-    }
+    dataset_param = DATASET_PARAMS[target]
     train_dataset = tf_dataset.get_dataset("train", **dataset_param)
     valid_dataset = tf_dataset.get_dataset("validation", **dataset_param)
 

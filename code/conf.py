@@ -1,6 +1,7 @@
 import os
 import librosa
 import numpy as np
+import tensorflow as tf
 
 CODE_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.join(CODE_DIR, "..")
@@ -35,9 +36,48 @@ AUDIO_CLIP_HOP = 2.5
 BATCH_SIZE = 16
 LEARNING_RATE = 1e-4
 
-
 STFT_16K_PARAMS = {"n_fft": 512, "hop_length": 256, "window": "hann", "center": True}
 STFT_44K_PARAMS = {"n_fft": 4096, "hop_length": 1024, "window": "hann", "center": True}
+
+DATASET_PARAMS = {
+    "original": {
+        "use_spectrogram": True,
+        "use_irm": False,
+        "sr": SR,
+        "sr_postfix_str": "",
+        "target_output_length": None,
+        "batch_size": BATCH_SIZE,
+        "output_data_mapper": lambda x1, x2, y: ((x1, x2), y)
+    },
+    "baseline": {
+        "use_spectrogram": False,
+        "use_irm": True,
+        "sr": 16000,
+        "sr_postfix_str": "_16k",
+        "target_output_length": None,
+        "batch_size": BATCH_SIZE,
+        "output_data_mapper": lambda x1, x2, y: ((x1, x2), y)
+    },
+    "wave-u-net": {
+        "use_spectrogram": False,
+        "use_irm": False,
+        "sr": SR,
+        "sr_postfix_str": "",
+        "target_output_length": 86021,
+        "batch_size": 8,  # GPU memory limit
+        "output_data_mapper": lambda x1, x2, y:
+            ((tf.expand_dims(x1, -1), tf.expand_dims(x2, -1)), tf.expand_dims(y, -1))
+    },
+    "wave-u-net-baseline": {
+        "use_spectrogram": False,
+        "use_irm": False,
+        "sr": SR,
+        "sr_postfix_str": "",
+        "target_output_length": 86021,
+        "batch_size": 8,
+        "output_data_mapper": lambda x1, x2, y: ((tf.expand_dims(x1, -1),), tf.expand_dims(y, -1))
+    }
+}
 
 
 def stft_routine(wav, sr):
