@@ -30,7 +30,7 @@ def extract_audios(src_path, target_dir):
     soundfile.write(os.path.join(target_dir, "mixed_input.wav"), data["input"], SR)
 
 
-for i in range(13):
+for i in range(1):
     sync_dir = os.path.join(SYNC_DIR, str(i))
     real_dir = os.path.join(REAL_DIR, str(i))
     try:
@@ -41,5 +41,5 @@ for i in range(13):
     os.mkdir(sync_dir)
     os.mkdir(real_dir)
 
-    extract_audios(os.path.join(DATA_DIR, "train", f"{random.randint(0, 4000):06}.npz"), sync_dir)
-    extract_audios(os.path.join(DATA_DIR, "test", f"{random.randint(0, 400):06}.npz"), real_dir)
+    # extract_audios(os.path.join(DATA_DIR, "train", f"{random.randint(0, 4000):06}.npz"), sync_dir)
+    extract_audios(os.path.join(DATA_DIR, "test", f"{11:06}.npz"), real_dir)

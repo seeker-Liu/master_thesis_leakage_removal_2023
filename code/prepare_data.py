@@ -165,7 +165,6 @@ def add_reverb(audio, ir):
 
 def sync_audio(data_type: str, src_info: dict[str: tuple[str, int, int]]) -> list[dict[str: np.array]]:
     temp = {}
-    ans = {}
     for t, src in src_info.items():
         # t == "truth" or "leak"
         path, channel, program = src
@@ -194,34 +193,28 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int, int]]) -> lis
         temp["leak_convoluted_16k"] = librosa.resample(temp["leak_convoluted"], orig_sr=SR, target_sr=16000)
 
     answers = []
-    # for i in range(0, temp["truth"].size // SR - AUDIO_CLIP_HOP, AUDIO_CLIP_HOP):
-    i = 0
-    while i < temp["truth"].size / SR - AUDIO_CLIP_HOP:
-        # Public information shared among different sample rate and stft configs.
-        ans = {"truth_path": temp["truth_path"], "leak_path": temp["leak_path"], "starting_seconds": i,
+    if data_type == "test":
+        # Save whole audio in one.
+        ans = {"truth_path": temp["truth_path"], "leak_path": temp["leak_path"], "starting_seconds": 0,
                "snr": get_random_snr()}
         if ADD_NOISE:
-            noise = random.choice(noises)
-            # Randomly select a 10s continuous fragment
-            noise_fragment_index = random.randrange(0, len(noise) - AUDIO_CLIP_LENGTH * SR)
-            ans["noise"] = noise[noise_fragment_index: noise_fragment_index + AUDIO_CLIP_LENGTH * SR].copy()
+            ans["noise"] = random.choice(noises).copy()
             if SAVE_16K:
                 ans["noise_16k"] = librosa.resample(ans["noise"], orig_sr=44100, target_sr=16000)
             ans["noise_snr"] = get_random_noise_snr()
 
         def save_content(sr, sr_str):
-            index_range = slice(int(i * sr), int((i + AUDIO_CLIP_LENGTH) * sr))
-            ans["truth" + sr_str] = temp["truth" + sr_str][index_range].copy()
-            ans["ref" + sr_str] = temp["leak" + sr_str][index_range].copy()
-            ans["leak" + sr_str] = temp["leak_convoluted" + sr_str][index_range].copy()
-
-            # Zero-padding if audio clip is shorter than AUDIO_CLIP_LENGTH seconds
-            ans["truth" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
-            ans["ref" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
-            ans["leak" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
-
+            ans["truth" + sr_str] = temp["truth" + sr_str].copy()
+            ans["ref" + sr_str] = temp["leak" + sr_str].copy()
+            ans["leak" + sr_str] = temp["leak_convoluted" + sr_str].copy()
             ans["input" + sr_str] = mix_on_given_snr(ans["snr"], ans["truth" + sr_str], ans["leak" + sr_str])
             if ADD_NOISE:
+                if ans["noise" + sr_str].size < ans["input" + sr_str].size:
+                    # If the noise is not long enough we repeat it.
+                    rep_times = ans["input" + sr_str].size // ans["noise" + sr_str] + 1
+                    ans["noise" + sr_str] = np.tile(ans["noise" + sr_str], rep_times)
+                # Then if noise is longer, chop it
+                ans["noise" + sr_str].resize(ans["input" + sr_str].shape, refcheck=False)
                 ans["input" + sr_str] = mix_on_given_snr(ans["noise_snr"], ans["input" + sr_str], ans["noise" + sr_str])
 
             if SAVE_SPECTROGRAM:
@@ -238,7 +231,53 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int, int]]) -> lis
             save_content(16000, "_16k")
         answers.append(ans)
 
-        i += AUDIO_CLIP_HOP
+    else:
+        # for i in range(0, temp["truth"].size // SR - AUDIO_CLIP_HOP, AUDIO_CLIP_HOP):
+        i = 0
+        while i < temp["truth"].size / SR - AUDIO_CLIP_HOP:
+            # Public information shared among different sample rate and stft configs.
+            ans = {"truth_path": temp["truth_path"], "leak_path": temp["leak_path"], "starting_seconds": i,
+                   "snr": get_random_snr()}
+            if ADD_NOISE:
+                noise = random.choice(noises)
+                # Randomly select a continuous fragment
+                noise_fragment_index = random.randrange(0, len(noise) - AUDIO_CLIP_LENGTH * SR)
+                ans["noise"] = noise[noise_fragment_index: noise_fragment_index + AUDIO_CLIP_LENGTH * SR].copy()
+                if SAVE_16K:
+                    ans["noise_16k"] = librosa.resample(ans["noise"], orig_sr=44100, target_sr=16000)
+                ans["noise_snr"] = get_random_noise_snr()
+
+            def save_content(sr, sr_str):
+                index_range = slice(int(i * sr), int((i + AUDIO_CLIP_LENGTH) * sr))
+                ans["truth" + sr_str] = temp["truth" + sr_str][index_range].copy()
+                ans["ref" + sr_str] = temp["leak" + sr_str][index_range].copy()
+                ans["leak" + sr_str] = temp["leak_convoluted" + sr_str][index_range].copy()
+
+                # Zero-padding if audio clip is shorter than AUDIO_CLIP_LENGTH seconds
+                ans["truth" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
+                ans["ref" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
+                ans["leak" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
+
+                ans["input" + sr_str] = mix_on_given_snr(ans["snr"], ans["truth" + sr_str], ans["leak" + sr_str])
+                if ADD_NOISE:
+                    ans["input" + sr_str] = \
+                        mix_on_given_snr(ans["noise_snr"], ans["input" + sr_str], ans["noise" + sr_str])
+
+                if SAVE_SPECTROGRAM:
+                    for t in ["truth", "ref", "input"]:
+                        ans[t + "_mag" + sr_str], ans[t + "_phase" + sr_str] = stft_routine(ans[t + sr_str], sr)
+
+                if not SAVE_AUDIO:
+                    ans.pop("truth" + sr_str)
+                    ans.pop("leak" + sr_str)
+                    ans.pop("truth" + sr_str)
+
+            save_content(SR, "")
+            if SAVE_16K:
+                save_content(16000, "_16k")
+            answers.append(ans)
+
+            i += AUDIO_CLIP_HOP
 
     return answers
 
@@ -297,6 +336,3 @@ if __name__ == '__main__':
                 out_path = os.path.join(DIRS[t], f"{j:06}.npz")
                 j += 1
                 np.savez(out_path, **audio)
-                if DEBUG:
-                    for k, v in audio.items():
-                        soundfile.write(os.path.join(DATA_DIR, k + "-test.wav"), v, SR)
