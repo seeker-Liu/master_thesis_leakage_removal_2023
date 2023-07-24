@@ -109,19 +109,22 @@ def wave_u_net_aec(num_initial_filters=24, num_layers=12, kernel_size=15, merge_
 
 # Parameters for the Wave-U-net
 
-params = {
-    "num_initial_filters": 24,
-    "num_layers": 12,
-    "kernel_size": 15,
-    "merge_filter_size": 5,
-    "source_names": ["bass", "drums", "other", "vocals"],
-    "num_channels": 2,
-    "output_filter_size": 1,
-    "padding": "valid",
-    "input_size": 147443,
-    "context": True,
-    "upsampling_type": "learned",  # "learned" or "linear"
-    "output_activation": "linear",  # "linear" or "tanh"
-    "output_type": "difference",  # "direct" or "difference"
-}
+if __name__ == "__main__":
 
+    wave_u_net_params = {
+        "num_initial_filters": 24,
+        "num_layers": 12,
+        "kernel_size": 15,
+        "merge_filter_size": 5,
+        "source_names": ["target", "leaked"],
+        "num_channels": 1,
+        "output_filter_size": 1,
+        "padding": "valid",
+        "input_size": 44100 * 5,
+        "context": True,
+        "upsampling_type": "linear",  # "learned" or "linear"
+        "output_activation": "linear",  # "linear" or "tanh"
+        "output_type": "difference",  # "direct" or "difference"
+    }
+    model = wave_u_net_aec(**wave_u_net_params)
+    model.summary()

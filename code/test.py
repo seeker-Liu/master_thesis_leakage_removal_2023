@@ -56,11 +56,6 @@ if __name__ == "__main__":
         sdr, sir, sar = get_metric(result_wav)
         algo_sdrs.append(sdr)
         print(f"Result metrics: SDR: {sdr:.5f}, SIR: {sir:.5f}, SAR: {sar:.5f}")
-        baseline_wav = istft_routine(data["input_mag"] * 2 - data["ref_mag"], data["input_phase"], SR).copy()
-        baseline_wav.resize(truth_wav.shape)
-        sdr, sir, sar = get_metric(baseline_wav)
-        print(f"Baseline metrics: SDR: {sdr:.5f}, SIR: {sir:.5f}, SAR: {sar:.5f}")
-        baseline_sdrs.append(sdr)
 
         output_dir = os.path.join(MODEL_DIR, "test_output")
         try:

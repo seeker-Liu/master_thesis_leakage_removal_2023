@@ -3,9 +3,11 @@ from conf import *
 import tensorflow as tf
 from baseline_model import build_ideal_mask
 import numpy as np
+from typing import Callable
 
 
-def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_output_length):
+def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_output_length, batch_size,
+                output_data_mapper: Callable):
     """
     :param t:  "train", "validation" or "test'
     :param use_spectrogram: Use spectrogram or not.
@@ -14,6 +16,10 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_out
     :param sr_postfix_str Postfix string of sr
     :param target_output_length Only meaningful to Wave-u-net model, wave-u-net model use a context setting and only
     the middle part is kept as prediction.
+    :param batch_size
+    :param output_data_mapper It is a mapper that maps raw input (spectrogram or waveform without extra dimension) to
+    the shape that downstream models need. It should take 3 arguments (mixture, leakage, ground_truth) and
+    transform them into proper type and shape.
     :return: Required datasets.
     """
     dataset = tf.data.Dataset.list_files(os.path.join(DATA_DIR, t, "*.npz"))
@@ -37,7 +43,7 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_out
             data = np.load(filepath)
             if SAVE_SPECTROGRAM:
                 return data["input_mag" + sr_postfix_str], \
-                       data["ref_mag" + sr_postfix_str], data["truth_mag" + sr_postfix_str]
+                    data["ref_mag" + sr_postfix_str], data["truth_mag" + sr_postfix_str]
             else:
                 input_mag = stft_routine(data["input" + sr_postfix_str], sr)
                 ref_mag = stft_routine(data["ref" + sr_postfix_str], sr)
@@ -54,12 +60,9 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_out
 
     def dataset_mapper_wrapper(filepath):
         x1, x2, y = tf.numpy_function(dataset_mapper, [filepath], (tf.float32, tf.float32, tf.float32))
-        if use_irm or use_spectrogram:
-            return (x1, x2), y
-        else:
-            return (tf.expand_dims(x1, -1), tf.expand_dims(x2, -1)), tf.expand_dims(y, -1)
+        return output_data_mapper(x1, x2, y)
 
-    dataset = dataset.map(dataset_mapper_wrapper).batch(BATCH_SIZE)
+    dataset = dataset.map(dataset_mapper_wrapper).batch(batch_size)
     return dataset
 
 
