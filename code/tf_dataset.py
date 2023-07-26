@@ -6,8 +6,8 @@ import numpy as np
 from typing import Callable
 
 
-def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_output_length, batch_size,
-                output_data_mapper: Callable):
+def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_input_length, target_output_length,
+                batch_size, output_data_mapper: Callable):
     """
     :param t:  "train", "validation" or "test'
     :param use_spectrogram: Use spectrogram or not.
@@ -50,13 +50,19 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_out
                 truth_mag = stft_routine(data["truth" + sr_postfix_str], sr)
                 return input_mag, ref_mag, truth_mag
     else:
-        begin_idx = ((sr * AUDIO_CLIP_LENGTH) - target_output_length) // 2
-        end_idx = sr * AUDIO_CLIP_LENGTH - target_output_length - begin_idx
+        # Get the slice of the center part.
+        def get_slices(total_len, target_length):
+            begin_index = (total_len - target_length) // 2
+            end_idx = total_len - target_length - begin_index
+            return slice(begin_index, -end_idx)
+
+        input_slice = get_slices(SR * AUDIO_CLIP_LENGTH, target_input_length)
+        output_slice = get_slices(SR * AUDIO_CLIP_LENGTH, target_output_length)
 
         def dataset_mapper(filepath):
             data = np.load(filepath)
-            return data["input" + sr_postfix_str], data["ref" + sr_postfix_str], \
-                data["truth" + sr_postfix_str][begin_idx:-end_idx]
+            return data["input" + sr_postfix_str][input_slice], data["ref" + sr_postfix_str][input_slice], \
+                data["truth" + sr_postfix_str][output_slice]
 
     def dataset_mapper_wrapper(filepath):
         x1, x2, y = tf.numpy_function(dataset_mapper, [filepath], (tf.float32, tf.float32, tf.float32))
@@ -67,13 +73,7 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_out
 
 
 if __name__ == "__main__":
-    ds = get_dataset("train", True, False, SR, "", None)
-    i = iter(ds)
-    x, y = next(i)
-    x1, x2 = x
-    print(x1.shape, x2.shape, y.shape)
-
-    ds = get_dataset("train", False, True, 16000, "_16k", None)
+    ds = get_dataset("train", **DATASET_PARAMS["original"])
     i = iter(ds)
     x, y = next(i)
     x1, x2 = x

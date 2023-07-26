@@ -15,6 +15,13 @@ BASELINE_MODEL_DIR = os.path.join(ROOT_DIR, "baseline_model")
 WAVE_U_NET_MODEL_DIR = os.path.join(ROOT_DIR, "wave_u_net_model")
 WAVE_U_NET_BASELINE_MODEL_DIR = os.path.join(ROOT_DIR, "wave_u_net_baseline_model")
 
+MODEL_DIRS = {
+    "original": MODEL_DIR,
+    "baseline": BASELINE_MODEL_DIR,
+    "wave-u-net": WAVE_U_NET_MODEL_DIR,
+    "wave-u-net-baseline": WAVE_U_NET_BASELINE_MODEL_DIR,
+}
+
 SR = 44100
 
 SAVE_AUDIO = True
@@ -36,6 +43,9 @@ AUDIO_CLIP_HOP = 2.5
 BATCH_SIZE = 16
 LEARNING_RATE = 1e-4
 
+WAVE_U_NET_INPUT_LENGTH = 217075
+WAVE_U_NET_OUTPUT_LENGTH = 86021
+
 STFT_16K_PARAMS = {"n_fft": 512, "hop_length": 256, "window": "hann", "center": True}
 STFT_44K_PARAMS = {"n_fft": 4096, "hop_length": 1024, "window": "hann", "center": True}
 
@@ -45,6 +55,7 @@ DATASET_PARAMS = {
         "use_irm": False,
         "sr": SR,
         "sr_postfix_str": "",
+        "target_input_length": None,
         "target_output_length": None,
         "batch_size": BATCH_SIZE,
         "output_data_mapper": lambda x1, x2, y: ((x1, x2), y)
@@ -54,6 +65,7 @@ DATASET_PARAMS = {
         "use_irm": True,
         "sr": 16000,
         "sr_postfix_str": "_16k",
+        "target_input_length": None,
         "target_output_length": None,
         "batch_size": BATCH_SIZE,
         "output_data_mapper": lambda x1, x2, y: ((x1, x2), y)
@@ -63,7 +75,8 @@ DATASET_PARAMS = {
         "use_irm": False,
         "sr": SR,
         "sr_postfix_str": "",
-        "target_output_length": 86021,
+        "target_input_length": WAVE_U_NET_INPUT_LENGTH,
+        "target_output_length": WAVE_U_NET_OUTPUT_LENGTH,
         "batch_size": 8,  # GPU memory limit
         "output_data_mapper": lambda x1, x2, y:
             ((tf.expand_dims(x1, -1), tf.expand_dims(x2, -1)), tf.expand_dims(y, -1))
@@ -73,7 +86,8 @@ DATASET_PARAMS = {
         "use_irm": False,
         "sr": SR,
         "sr_postfix_str": "",
-        "target_output_length": 86021,
+        "target_input_length": WAVE_U_NET_INPUT_LENGTH,
+        "target_output_length": WAVE_U_NET_OUTPUT_LENGTH,
         "batch_size": 8,
         "output_data_mapper": lambda x1, x2, y: ((tf.expand_dims(x1, -1),), tf.expand_dims(y, -1))
     }

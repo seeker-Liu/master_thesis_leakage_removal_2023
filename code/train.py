@@ -32,12 +32,7 @@ if __name__ == "__main__":
         physical_devices = tf.config.list_physical_devices('GPU')
         # tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
-    model_dir = {
-        "baseline": BASELINE_MODEL_DIR,
-        "original": MODEL_DIR,
-        "wave-u-net-baseline": WAVE_U_NET_BASELINE_MODEL_DIR,
-        "wave-u-net": WAVE_U_NET_MODEL_DIR
-    }[target]
+    model_dir = MODEL_DIRS[target]
     try:
         os.mkdir(model_dir)
     except FileExistsError:
