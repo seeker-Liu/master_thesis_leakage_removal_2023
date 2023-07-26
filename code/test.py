@@ -23,6 +23,7 @@ def inference_original(model, data):
 def inference_wave_u_net(model, data):
     input_wav = data["input"]
     ref_wav = data["ref"]
+    out_wav = np.zeros(shape=input_wav.shape)
     assert input_wav.size == ref_wav.size
 
     left_margin = (WAVE_U_NET_INPUT_LENGTH - WAVE_U_NET_OUTPUT_LENGTH) // 2
@@ -44,6 +45,13 @@ def inference_wave_u_net(model, data):
             input_seg[left_margin:] = input_wav[i: i + WAVE_U_NET_INPUT_LENGTH - left_margin]
             ref_seg[left_margin:] = ref_wav[i: i + WAVE_U_NET_INPUT_LENGTH - left_margin]
 
+        out_seg = model((input_seg, ref_seg))
+        if i + WAVE_U_NET_OUTPUT_LENGTH <= out_wav.size:
+            out_wav[i: i + WAVE_U_NET_OUTPUT_LENGTH] = out_seg
+        else:
+            out_wav[i:] = out_seg[0: out_wav.size - i]
+
+        return input_wav, ref_wav, out_wav
 
 
 def inference(target: str, model, data):
