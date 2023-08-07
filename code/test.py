@@ -21,6 +21,7 @@ def inference_original(model, data):
 
 
 def inference_wave_u_net(model, data):
+    model.summary()
     input_wav = data["input"]
     ref_wav = data["ref"]
     out_wav = np.zeros(shape=input_wav.shape)
@@ -28,8 +29,8 @@ def inference_wave_u_net(model, data):
 
     left_margin = (WAVE_U_NET_INPUT_LENGTH - WAVE_U_NET_OUTPUT_LENGTH) // 2
     for i in range(0, input_wav.size, WAVE_U_NET_OUTPUT_LENGTH):
-        input_seg = np.zeros((WAVE_U_NET_INPUT_LENGTH, 1), np.float32)
-        ref_seg = np.zeros((WAVE_U_NET_INPUT_LENGTH, 1), np.float32)
+        input_seg = np.zeros((WAVE_U_NET_INPUT_LENGTH, ), np.float32)
+        ref_seg = np.zeros((WAVE_U_NET_INPUT_LENGTH, ), np.float32)
 
         if i < left_margin:
             input_seg[left_margin - i: left_margin] = input_wav[0:i]
@@ -45,7 +46,7 @@ def inference_wave_u_net(model, data):
             input_seg[left_margin:] = input_wav[i: i + WAVE_U_NET_INPUT_LENGTH - left_margin]
             ref_seg[left_margin:] = ref_wav[i: i + WAVE_U_NET_INPUT_LENGTH - left_margin]
 
-        out_seg = model((input_seg, ref_seg))
+        out_seg = model((np.expand_dims(input_seg, -1), np.expand_dims(ref_seg, -1)))
         if i + WAVE_U_NET_OUTPUT_LENGTH <= out_wav.size:
             out_wav[i: i + WAVE_U_NET_OUTPUT_LENGTH] = out_seg
         else:
