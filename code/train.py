@@ -13,15 +13,15 @@ if __name__ == "__main__":
     continue_train = False
     target = "original"  # "original", "baseline" or "wave-u-net"
     for arg in sys.argv[1:]:
-        if arg == "-no-gpu":
+        if arg == "--no-gpu":
             no_gpu = True
         elif arg == "-c" or arg == "-continue":
             continue_train = True
         elif arg == "-b" or arg == "-baseline":
             target = "baseline"
-        elif arg == "-wave-u-net":
+        elif arg == "--wave-u-net":
             target = "wave-u-net"
-        elif arg == "-wave-u-net-baseline":
+        elif arg == "--wave-u-net-baseline":
             target = "wave-u-net-baseline"
         else:
             print(f"Unknown arg: {arg}")

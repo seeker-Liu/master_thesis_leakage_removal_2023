@@ -21,7 +21,6 @@ def inference_original(model, data):
 
 
 def inference_wave_u_net(model, data):
-    model.summary()
     input_wav = data["input"]
     ref_wav = data["ref"]
     out_wav = np.zeros(shape=input_wav.shape)
@@ -46,13 +45,16 @@ def inference_wave_u_net(model, data):
             input_seg[left_margin:] = input_wav[i: i + WAVE_U_NET_INPUT_LENGTH - left_margin]
             ref_seg[left_margin:] = ref_wav[i: i + WAVE_U_NET_INPUT_LENGTH - left_margin]
 
-        out_seg = model((np.expand_dims(input_seg, -1), np.expand_dims(ref_seg, -1)))
+        input_seg = np.expand_dims(input_seg, (0, -1))
+        ref_seg = np.expand_dims(ref_seg, (0, -1))
+        out_seg = model((input_seg, ref_seg), training=False)["target"].numpy()
+        out_seg = np.squeeze(out_seg)
         if i + WAVE_U_NET_OUTPUT_LENGTH <= out_wav.size:
             out_wav[i: i + WAVE_U_NET_OUTPUT_LENGTH] = out_seg
         else:
             out_wav[i:] = out_seg[0: out_wav.size - i]
 
-        return input_wav, ref_wav, out_wav
+    return input_wav, ref_wav, out_wav
 
 
 def inference(target: str, model, data):
@@ -75,15 +77,15 @@ if __name__ == "__main__":
     no_gpu = False
     target = None
     for arg in sys.argv[1:]:
-        if arg == "-no-gpu":
+        if arg == "--no-gpu":
             no_gpu = True
-        elif arg == "-original":
+        elif arg == "--original":
             target = "original"
-        elif arg == "-baseline":
+        elif arg == "--baseline":
             target = "baseline"
-        elif arg == "-wave-u-net":
+        elif arg == "--wave-u-net":
             target = "wave-u-net"
-        elif arg == "-wave-u-net-baseline":
+        elif arg == "--wave-u-net-baseline":
             target = "wave-u-net-baseline"
 
     if no_gpu:
