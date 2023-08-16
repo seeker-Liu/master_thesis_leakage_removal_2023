@@ -67,7 +67,7 @@ if __name__ == "__main__":
                 "num_channels": 1,
                 "output_filter_size": 1,
                 "padding": "valid",
-                "input_size": 44100 * 5,
+                "input_size": WAVE_U_NET_INPUT_LENGTH,
                 "context": True,
                 "upsampling_type": "linear",  # "learned" or "linear"
                 "output_activation": "linear",  # "linear" or "tanh"
