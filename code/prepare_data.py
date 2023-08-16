@@ -288,6 +288,7 @@ if __name__ == '__main__':
     DIRS = {x: y for x, y in zip(TYPES, DIRS)}
 
     DEBUG = False
+    for_wave_u_net = False
     targets = []
     for arg in sys.argv[1:]:
         if arg == "--debug":
@@ -300,6 +301,8 @@ if __name__ == '__main__':
             targets.append("valid")
         elif arg == "--test":
             targets.append("test")
+        elif arg == "--wave-u-net":
+            for_wave_u_net = True
         else:
             print(f"Unknown option: {arg}")
     DIRS = {k: v for k, v in DIRS.items() if k in targets}

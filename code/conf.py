@@ -46,8 +46,9 @@ LEARNING_RATE = 1e-4
 WAVE_U_NET_INPUT_LENGTH = 217075
 WAVE_U_NET_OUTPUT_LENGTH = 86021
 
-STFT_16K_PARAMS = {"n_fft": 512, "hop_length": 256, "window": "hann", "center": True}
-STFT_44K_PARAMS = {"n_fft": 4096, "hop_length": 1024, "window": "hann", "center": True}
+STFT_PARAMS = {16000: {"n_fft": 512, "hop_length": 256, "window": "hann", "center": True},
+               44100: {"n_fft": 4096, "hop_length": 1024, "window": "hann", "center": True},
+               8192: {"n_fft": 1024, "hop_length": 256, "window": "hann", "center": True}}
 
 DATASET_PARAMS = {
     "original": {
@@ -95,12 +96,12 @@ DATASET_PARAMS = {
 
 
 def stft_routine(wav, sr):
-    params = STFT_44K_PARAMS if sr == SR else STFT_16K_PARAMS
+    params = STFT_PARAMS[sr]
     spec = librosa.stft(wav, **params).T
     return np.abs(spec), np.angle(spec)
 
 
 def istft_routine(mag, phase, sr):
-    params = STFT_44K_PARAMS if sr == SR else STFT_16K_PARAMS
+    params = STFT_PARAMS[sr]
     spec = (mag * np.exp(phase * 1j)).T
     return librosa.istft(spec, **params)
