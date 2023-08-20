@@ -8,7 +8,6 @@ import numpy as np
 import scipy.signal
 import pretty_midi
 import librosa
-import soundfile
 
 
 def get_sync_list() -> list:
@@ -163,7 +162,11 @@ def add_reverb(audio, ir):
     return audio
 
 
-def sync_audio(data_type: str, src_info: dict[str: tuple[str, int, int]]) -> list[dict[str: np.array]]:
+def sync_audio(data_type: str,
+               src_info: dict[str: tuple[str, int, int]],
+               clip_length: float = AUDIO_CLIP_LENGTH,
+               clip_hop: float = AUDIO_CLIP_HOP,
+               sync_for_u_net: bool = False) -> list[dict[str: np.array]]:
     temp = {}
     for t, src in src_info.items():
         # t == "truth" or "leak"
@@ -187,7 +190,11 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int, int]]) -> lis
     temp["leak"] = np.resize(temp["leak"], temp["truth"].size)
     # leak is not conv'ed so is slightly shorter, compensate that.
 
-    if SAVE_16K:
+    if sync_for_u_net:
+        temp["truth_8k"] = librosa.resample(temp["truth"], orig_sr=SR, target_sr=8192)
+        temp["leak_8k"] = librosa.resample(temp["leak"], orig_sr=SR, target_sr=8192)
+        temp["leak_convoluted_8k"] = librosa.resample(temp["leak_convoluted"], orig_sr=SR, target_sr=8192)
+    elif SAVE_16K:
         temp["truth_16k"] = librosa.resample(temp["truth"], orig_sr=SR, target_sr=16000)
         temp["leak_16k"] = librosa.resample(temp["leak"], orig_sr=SR, target_sr=16000)
         temp["leak_convoluted_16k"] = librosa.resample(temp["leak_convoluted"], orig_sr=SR, target_sr=16000)
@@ -199,8 +206,10 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int, int]]) -> lis
                "snr": get_random_snr()}
         if ADD_NOISE:
             ans["noise"] = random.choice(noises).copy()
-            if SAVE_16K:
-                ans["noise_16k"] = librosa.resample(ans["noise"], orig_sr=44100, target_sr=16000)
+            if sync_for_u_net:
+                ans["noise_8k"] = librosa.resample(ans["noise"], orig_sr=SR, target_sr=8192)
+            elif SAVE_16K:
+                ans["noise_16k"] = librosa.resample(ans["noise"], orig_sr=SR, target_sr=16000)
             ans["noise_snr"] = get_random_noise_snr()
 
         def save_content(sr, sr_str):
@@ -215,6 +224,7 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int, int]]) -> lis
                     ans["noise" + sr_str] = np.tile(ans["noise" + sr_str], rep_times)
                 # Then if noise is longer, chop it
                 ans["noise" + sr_str].resize(ans["input" + sr_str].shape, refcheck=False)
+
                 ans["input" + sr_str] = mix_on_given_snr(ans["noise_snr"], ans["input" + sr_str], ans["noise" + sr_str])
 
             if SAVE_SPECTROGRAM:
@@ -226,37 +236,42 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int, int]]) -> lis
                 ans.pop("leak" + sr_str)
                 ans.pop("truth" + sr_str)
 
-        save_content(SR, "")
-        if SAVE_16K:
-            save_content(16000, "_16k")
+        if sync_for_u_net:
+            save_content(8192, "_8k")
+        else:
+            save_content(SR, "")
+            if SAVE_16K:
+                save_content(16000, "_16k")
         answers.append(ans)
 
     else:
         # for i in range(0, temp["truth"].size // SR - AUDIO_CLIP_HOP, AUDIO_CLIP_HOP):
         i = 0
-        while i < temp["truth"].size / SR - AUDIO_CLIP_HOP:
+        while i < temp["truth"].size / SR - clip_hop:
             # Public information shared among different sample rate and stft configs.
             ans = {"truth_path": temp["truth_path"], "leak_path": temp["leak_path"], "starting_seconds": i,
                    "snr": get_random_snr()}
             if ADD_NOISE:
                 noise = random.choice(noises)
                 # Randomly select a continuous fragment
-                noise_fragment_index = random.randrange(0, len(noise) - AUDIO_CLIP_LENGTH * SR)
-                ans["noise"] = noise[noise_fragment_index: noise_fragment_index + AUDIO_CLIP_LENGTH * SR].copy()
+                noise_fragment_index = random.randrange(0, len(noise) - int(clip_length * SR))
+                ans["noise"] = noise[noise_fragment_index: noise_fragment_index + int(clip_length * SR)].copy()
+                if sync_for_u_net:
+                    ans["noise_8k"] = librosa.resample(ans["noise"], orig_sr=SR, target_sr=8192)
                 if SAVE_16K:
-                    ans["noise_16k"] = librosa.resample(ans["noise"], orig_sr=44100, target_sr=16000)
+                    ans["noise_16k"] = librosa.resample(ans["noise"], orig_sr=SR, target_sr=16000)
                 ans["noise_snr"] = get_random_noise_snr()
 
             def save_content(sr, sr_str):
-                index_range = slice(int(i * sr), int((i + AUDIO_CLIP_LENGTH) * sr))
+                index_range = slice(int(i * sr), int((i + clip_length) * sr))
                 ans["truth" + sr_str] = temp["truth" + sr_str][index_range].copy()
                 ans["ref" + sr_str] = temp["leak" + sr_str][index_range].copy()
                 ans["leak" + sr_str] = temp["leak_convoluted" + sr_str][index_range].copy()
 
                 # Zero-padding if audio clip is shorter than AUDIO_CLIP_LENGTH seconds
-                ans["truth" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
-                ans["ref" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
-                ans["leak" + sr_str].resize(sr * AUDIO_CLIP_LENGTH, refcheck=False)
+                ans["truth" + sr_str].resize((int(sr * clip_length), ), refcheck=False)
+                ans["ref" + sr_str].resize((int(sr * clip_length), ), refcheck=False)
+                ans["leak" + sr_str].resize((int(sr * clip_length), ), refcheck=False)
 
                 ans["input" + sr_str] = mix_on_given_snr(ans["snr"], ans["truth" + sr_str], ans["leak" + sr_str])
                 if ADD_NOISE:
@@ -272,12 +287,15 @@ def sync_audio(data_type: str, src_info: dict[str: tuple[str, int, int]]) -> lis
                     ans.pop("leak" + sr_str)
                     ans.pop("truth" + sr_str)
 
-            save_content(SR, "")
-            if SAVE_16K:
-                save_content(16000, "_16k")
+            if sync_for_u_net:
+                save_content(8192, "_8k")
+            else:
+                save_content(SR, "")
+                if SAVE_16K:
+                    save_content(16000, "_16k")
             answers.append(ans)
 
-            i += AUDIO_CLIP_HOP
+            i += clip_hop
 
     return answers
 
@@ -288,7 +306,8 @@ if __name__ == '__main__':
     DIRS = {x: y for x, y in zip(TYPES, DIRS)}
 
     DEBUG = False
-    for_wave_u_net = False
+    for_u_net = False
+    for_regular = True
     targets = []
     for arg in sys.argv[1:]:
         if arg == "--debug":
@@ -301,20 +320,37 @@ if __name__ == '__main__':
             targets.append("valid")
         elif arg == "--test":
             targets.append("test")
-        elif arg == "--wave-u-net":
-            for_wave_u_net = True
+        elif arg == "--u-net":
+            for_u_net = True
+        elif arg == "--no-regular":
+            for_regular = False
         else:
             print(f"Unknown option: {arg}")
     DIRS = {k: v for k, v in DIRS.items() if k in targets}
+    if not for_regular and not for_u_net:
+        raise ValueError("At least do something?")
+
     del targets
 
     # Clean dirs
     for d in DIRS.values():
+        # Clean up regular content
         try:
-            shutil.rmtree(d)
-        except FileNotFoundError:
+            os.mkdir(d)
+        except FileExistsError:
             pass
-        os.mkdir(d)
+
+        def clean_dir(path):
+            try:
+                shutil.rmtree(path)
+            except FileNotFoundError:
+                pass
+            os.mkdir(path)
+        if for_regular:
+            regular_dir = os.path.join(d, "regular")
+            clean_dir(regular_dir)
+        if for_u_net:
+            clean_dir(os.path.join(d, "u_net"))
 
     # Set-up IRs
     print("Setting up IRs' data")
@@ -323,19 +359,30 @@ if __name__ == '__main__':
     # Set-up noises
     print("Setting up noises' data")
     noises = [load_audio(noise) for noise in get_noise_list()]
-    noises = [noise for noise in noises if len(noise) >= AUDIO_CLIP_LENGTH * SR]
+    noises = [noise for noise in noises if len(noise) >= 15 * SR]  # Get long enough noise
 
     # Actually synth
     data_lists = get_data_list()
     for t in DIRS.keys():
         print(f"Preparing {t} data")
-        j = 0
-        data_list = data_lists[t]
-        for i, info in enumerate(data_list):
-            if i % 10 == 0:
-                print(f"{i} / {len(data_list)}")
-            audios = sync_audio(t, info)
-            for audio in audios:
-                out_path = os.path.join(DIRS[t], f"{j:06}.npz")
-                j += 1
-                np.savez(out_path, **audio)
+        # Save two types of data
+
+        def sync_and_save(target_dir, data_list, sync_audio_params):
+            j = 0
+            for i, info in enumerate(data_list):
+                if i % 10 == 0:
+                    print(f"{i} / {len(data_list)}")
+                audios = sync_audio(t, info, **sync_audio_params)
+                for audio in audios:
+                    out_path = os.path.join(target_dir, f"{j:06}.npz")
+                    j += 1
+                    np.savez(out_path, **audio)
+
+        if for_regular:
+            print("Regular part.")
+            sync_and_save(os.path.join(DIRS[t], "regular"), data_lists[t], {})
+        if for_u_net:
+            print("Special for wave-u-net.")
+            sync_and_save(os.path.join(DIRS[t], "u_net"), data_lists[t],
+                          {"clip_length": 12.1, "clip_hop": 12.1/2, "sync_for_u_net": True})
+

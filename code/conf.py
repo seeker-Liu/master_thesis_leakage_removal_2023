@@ -48,7 +48,7 @@ WAVE_U_NET_OUTPUT_LENGTH = 86021
 
 STFT_PARAMS = {16000: {"n_fft": 512, "hop_length": 256, "window": "hann", "center": True},
                44100: {"n_fft": 4096, "hop_length": 1024, "window": "hann", "center": True},
-               8192: {"n_fft": 1024, "hop_length": 256, "window": "hann", "center": True}}
+               8192: {"n_fft": 1024, "hop_length": 768, "window": "hann", "center": False}}
 
 DATASET_PARAMS = {
     "original": {
@@ -91,17 +91,43 @@ DATASET_PARAMS = {
         "target_output_length": WAVE_U_NET_OUTPUT_LENGTH,
         "batch_size": 8,
         "output_data_mapper": lambda x1, x2, y: ((tf.expand_dims(x1, -1),), tf.expand_dims(y, -1))
-    }
+    },
+    "u-net": {
+        "use_spectrogram": True,
+        "use_irm": False,
+        "sr": 8192,
+        "sr_postfix_str": "_8k",
+        "target_input_length": None,
+        "target_output_length": None,
+        "batch_size": 16,
+        "output_data_mapper": lambda x1, x2, y: ((x1, x2), y)
+    },
+    "u-net-baseline": {
+        "use_spectrogram": True,
+        "use_irm": False,
+        "sr": 8192,
+        "sr_postfix_str": "_8k",
+        "target_input_length": None,
+        "target_output_length": None,
+        "batch_size": 16,
+        "output_data_mapper": lambda x1, x2, y: ((x1, ), y)
+    },
 }
 
 
 def stft_routine(wav, sr):
     params = STFT_PARAMS[sr]
     spec = librosa.stft(wav, **params).T
+    if sr == 8192:
+        spec = spec[:, 0:512]
     return np.abs(spec), np.angle(spec)
 
 
 def istft_routine(mag, phase, sr):
     params = STFT_PARAMS[sr]
     spec = (mag * np.exp(phase * 1j)).T
+    if sr == 8192:
+        temp = np.zeros((513, spec.shape[1]), dtype=np.complex64)
+        temp[0:512, :] = spec
+        spec = temp
     return librosa.istft(spec, **params)

@@ -87,6 +87,12 @@ if __name__ == "__main__":
             target = "wave-u-net"
         elif arg == "--wave-u-net-baseline":
             target = "wave-u-net-baseline"
+        elif arg == "--u-net":
+            target = "u-net"
+        elif arg == "--u-net-baseline":
+            target = "u-net-baseline"
+        else:
+            print(f"unknown arg {arg}")
 
     if no_gpu:
         tf.config.set_visible_devices([], 'GPU')
@@ -94,7 +100,8 @@ if __name__ == "__main__":
         physical_devices = tf.config.list_physical_devices('GPU')
         tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
-    data_files = [os.path.join(TEST_DIR, np_f) for np_f in os.listdir(TEST_DIR)]
+    test_data_dir = os.path.join(TEST_DIR, "regular" if target[0:5] != "u-net" else "u_net")
+    data_files = [os.path.join(test_data_dir, np_f) for np_f in os.listdir(test_data_dir)]
 
     ckpt_folder = os.path.join(MODEL_DIRS[target], "checkpoint")
     last_model_name = sorted(os.listdir(ckpt_folder))[-1]

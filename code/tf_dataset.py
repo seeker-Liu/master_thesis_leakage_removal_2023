@@ -22,7 +22,8 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_inp
     transform them into proper type and shape.
     :return: Required datasets.
     """
-    dataset = tf.data.Dataset.list_files(os.path.join(DATA_DIR, t, "*.npz"))
+    data_type_str = "regular" if sr != 8192 else "u_net"
+    dataset = tf.data.Dataset.list_files(os.path.join(DATA_DIR, t, data_type_str, "*.npz"))
     dataset = dataset.shuffle(buffer_size=10000, reshuffle_each_iteration=True)
 
     if use_irm:
@@ -49,7 +50,7 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_inp
                 ref_mag = stft_routine(data["ref" + sr_postfix_str], sr)
                 truth_mag = stft_routine(data["truth" + sr_postfix_str], sr)
                 return input_mag, ref_mag, truth_mag
-    else:
+    else:  # For wave-u-net
         # Get the slice of the center part.
         def get_slices(total_len, target_length):
             begin_index = (total_len - target_length) // 2
@@ -73,7 +74,7 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_inp
 
 
 if __name__ == "__main__":
-    ds = get_dataset("train", **DATASET_PARAMS["original"])
+    ds = get_dataset("validation", **DATASET_PARAMS["u-net"])
     i = iter(ds)
     x, y = next(i)
     x1, x2 = x
