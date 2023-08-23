@@ -7,6 +7,8 @@ import tensorflow as tf
 import sys
 from wave_u_net.wave_u_net import wave_u_net
 from wave_u_net.wave_u_net_AEC import wave_u_net_aec
+from u_net.u_net_baseline import u_net_baseline
+from u_net.u_net import u_net
 
 if __name__ == "__main__":
     no_gpu = False
@@ -23,6 +25,10 @@ if __name__ == "__main__":
             target = "wave-u-net"
         elif arg == "--wave-u-net-baseline":
             target = "wave-u-net-baseline"
+        elif arg == "--u-net":
+            target = "u-net"
+        elif arg == "--u-net-baseline":
+            target = "u-net-baseline"
         else:
             print(f"Unknown arg: {arg}")
 
@@ -78,6 +84,12 @@ if __name__ == "__main__":
             optimizer = tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE)
             model.compile(optimizer=optimizer,
                           loss="mse")
+        elif target == "u-net":
+            model = u_net()
+            model.compile(optimizer="adam", loss="mean_absolute_error")
+        elif target == "u-net-baseline":
+            model = u_net_baseline()
+            model.compile(optimizer="adam", loss="mean_absolute_error")
 
     try:
         os.mkdir(ckpt_folder)

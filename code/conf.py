@@ -14,17 +14,20 @@ MODEL_DIR = os.path.join(ROOT_DIR, "model")
 BASELINE_MODEL_DIR = os.path.join(ROOT_DIR, "baseline_model")
 WAVE_U_NET_MODEL_DIR = os.path.join(ROOT_DIR, "wave_u_net_model")
 WAVE_U_NET_BASELINE_MODEL_DIR = os.path.join(ROOT_DIR, "wave_u_net_baseline_model")
+U_NET_MODEL_DIR = os.path.join(ROOT_DIR, "u_net_model")
+U_NET_BASELINE_MODEL_DIR = os.path.join(ROOT_DIR, "u_net_baseline_model")
 
 MODEL_DIRS = {
     "original": MODEL_DIR,
     "baseline": BASELINE_MODEL_DIR,
     "wave-u-net": WAVE_U_NET_MODEL_DIR,
     "wave-u-net-baseline": WAVE_U_NET_BASELINE_MODEL_DIR,
+    "u-net": U_NET_MODEL_DIR,
+    "u-net-baseline": U_NET_BASELINE_MODEL_DIR
 }
 
 SR = 44100
 
-SAVE_AUDIO = True
 SAVE_SPECTROGRAM = True
 SAVE_16K = False
 ADD_NOISE = False
@@ -100,7 +103,8 @@ DATASET_PARAMS = {
         "target_input_length": None,
         "target_output_length": None,
         "batch_size": 16,
-        "output_data_mapper": lambda x1, x2, y: ((x1, x2), y)
+        "output_data_mapper":
+            lambda x1, x2, y: ((tf.expand_dims(x1, -1), tf.expand_dims(x2, -1)), tf.expand_dims(y, -1))
     },
     "u-net-baseline": {
         "use_spectrogram": True,
@@ -110,7 +114,7 @@ DATASET_PARAMS = {
         "target_input_length": None,
         "target_output_length": None,
         "batch_size": 16,
-        "output_data_mapper": lambda x1, x2, y: ((x1, ), y)
+        "output_data_mapper": lambda x1, x2, y: ((tf.expand_dims(x1, -1), ), tf.expand_dims(y, -1))
     },
 }
 
@@ -118,15 +122,17 @@ DATASET_PARAMS = {
 def stft_routine(wav, sr):
     params = STFT_PARAMS[sr]
     spec = librosa.stft(wav, **params).T
-    if sr == 8192:
+
+    if sr == 8192:  # Cut the last freq bin
         spec = spec[:, 0:512]
-    return np.abs(spec), np.angle(spec)
+    return librosa.magphase(spec)
 
 
 def istft_routine(mag, phase, sr):
     params = STFT_PARAMS[sr]
-    spec = (mag * np.exp(phase * 1j)).T
-    if sr == 8192:
+    spec = (mag * phase).T
+
+    if sr == 8192:  # Append zero to the cut last freq bin
         temp = np.zeros((513, spec.shape[1]), dtype=np.complex64)
         temp[0:512, :] = spec
         spec = temp

@@ -74,8 +74,9 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_inp
 
 
 if __name__ == "__main__":
-    ds = get_dataset("validation", **DATASET_PARAMS["u-net"])
+    ds = get_dataset("validation", **DATASET_PARAMS["u-net-baseline"])
     i = iter(ds)
     x, y = next(i)
-    x1, x2 = x
-    print(x1.shape, x2.shape, y.shape)
+    # x1, x2 = x
+    # print(x1.shape, x2.shape, y.shape)
+    print(x[0].shape, y.shape)

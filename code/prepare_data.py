@@ -212,7 +212,7 @@ def sync_audio(data_type: str,
                 ans["noise_16k"] = librosa.resample(ans["noise"], orig_sr=SR, target_sr=16000)
             ans["noise_snr"] = get_random_noise_snr()
 
-        def save_content(sr, sr_str):
+        def save_content(sr, sr_str, save_spectrogram=SAVE_SPECTROGRAM):
             ans["truth" + sr_str] = temp["truth" + sr_str].copy()
             ans["ref" + sr_str] = temp["leak" + sr_str].copy()
             ans["leak" + sr_str] = temp["leak_convoluted" + sr_str].copy()
@@ -227,17 +227,14 @@ def sync_audio(data_type: str,
 
                 ans["input" + sr_str] = mix_on_given_snr(ans["noise_snr"], ans["input" + sr_str], ans["noise" + sr_str])
 
-            if SAVE_SPECTROGRAM:
+            if save_spectrogram:
                 for t in ["truth", "ref", "input"]:
                     ans[t + "_mag" + sr_str], ans[t + "_phase" + sr_str] = stft_routine(ans[t + sr_str], sr)
 
-            if not SAVE_AUDIO:
-                ans.pop("truth" + sr_str)
-                ans.pop("leak" + sr_str)
-                ans.pop("truth" + sr_str)
 
         if sync_for_u_net:
             save_content(8192, "_8k")
+            save_content(SR, "", False)
         else:
             save_content(SR, "")
             if SAVE_16K:
@@ -281,11 +278,6 @@ def sync_audio(data_type: str,
                 if SAVE_SPECTROGRAM:
                     for t in ["truth", "ref", "input"]:
                         ans[t + "_mag" + sr_str], ans[t + "_phase" + sr_str] = stft_routine(ans[t + sr_str], sr)
-
-                if not SAVE_AUDIO:
-                    ans.pop("truth" + sr_str)
-                    ans.pop("leak" + sr_str)
-                    ans.pop("truth" + sr_str)
 
             if sync_for_u_net:
                 save_content(8192, "_8k")
@@ -382,7 +374,7 @@ if __name__ == '__main__':
             print("Regular part.")
             sync_and_save(os.path.join(DIRS[t], "regular"), data_lists[t], {})
         if for_u_net:
-            print("Special for wave-u-net.")
+            print("Special for u-net.")
             sync_and_save(os.path.join(DIRS[t], "u_net"), data_lists[t],
                           {"clip_length": 12.1, "clip_hop": 12.1/2, "sync_for_u_net": True})
 
