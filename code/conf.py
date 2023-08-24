@@ -30,7 +30,7 @@ SR = 44100
 
 SAVE_SPECTROGRAM = True
 SAVE_16K = False
-ADD_NOISE = False
+ADD_NOISE = True
 
 URMP_VIOLIN_CLARINET_PIECES = {17: (0, 2), 19: (1, 0), 37: (1, 3)}
 URMP_VIOLIN_FLUTE_PIECE = {8: (1, 0), 17: (0, 1), 18: (0, 1), 37: (1, 0)}
@@ -137,3 +137,27 @@ def istft_routine(mag, phase, sr):
         temp[0:512, :] = spec
         spec = temp
     return librosa.istft(spec, **params)
+
+
+def grow_array(src, target):
+    tmp = np.zeros_like(target)
+    tmp[0:src.size] = src
+    return tmp
+
+
+def mix_on_given_snr(snr, signal, noise):
+    if signal.size / noise.size > 1.05 or signal.size / noise.size < 0.95:
+        raise ValueError("Two input array length mismatch seriously.")
+    if signal.size < noise.size:
+        signal = grow_array(signal, noise)
+    else:
+        noise = grow_array(noise, signal)
+
+    signal_energy = np.mean(signal ** 2)
+    noise_energy = np.mean(noise ** 2)
+
+    g = np.sqrt(10.0 ** (-snr / 10) * signal_energy / noise_energy)
+    a = np.sqrt(1 / (1 + g ** 2))
+    b = np.sqrt(g ** 2 / (1 + g ** 2))
+
+    return a * signal + b * noise, a, b

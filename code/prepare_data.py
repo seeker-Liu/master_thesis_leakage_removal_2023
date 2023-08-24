@@ -119,17 +119,6 @@ def get_random_noise_snr():
     return random.random() * -18 + 3  # [-15, 3] dB
 
 
-def mix_on_given_snr(snr, signal, noise):
-    signal_energy = np.mean(signal ** 2)
-    noise_energy = np.mean(noise ** 2)
-
-    g = np.sqrt(10.0 ** (-snr / 10) * signal_energy / noise_energy)
-    a = np.sqrt(1 / (1 + g ** 2))
-    b = np.sqrt(g ** 2 / (1 + g ** 2))
-
-    return a * signal + b * noise
-
-
 def shake_midi(midi_channel: pretty_midi.Instrument):
     # Shake the onsets of notes to simulate unstable performance from learners.
     # TODO
@@ -162,6 +151,7 @@ def add_reverb(audio, ir):
     return audio
 
 
+
 def sync_audio(data_type: str,
                src_info: dict[str: tuple[str, int, int]],
                clip_length: float = AUDIO_CLIP_LENGTH,
@@ -181,13 +171,13 @@ def sync_audio(data_type: str,
 
     # Defensive code for the situation that both lengths do not match
     if len(temp["leak"]) < len(temp["truth"]):
-        temp["leak"].resize(temp["truth"].shape, refcheck=False)
+        temp["leak"] = grow_array(temp["leak"], temp["truth"])
     else:
-        temp["truth"].resize(temp["leak"].shape, refcheck=False)
+        temp["truth"] = grow_array(temp["truth"], temp["leak"])
 
     temp["truth"] = add_reverb(temp["truth"], ir)
     temp["leak_convoluted"] = add_reverb(temp["leak"], ir)
-    temp["leak"] = np.resize(temp["leak"], temp["truth"].size)
+    temp["leak"] = grow_array(temp["leak"], temp["truth"])
     # leak is not conv'ed so is slightly shorter, compensate that.
 
     if sync_for_u_net:
@@ -216,21 +206,21 @@ def sync_audio(data_type: str,
             ans["truth" + sr_str] = temp["truth" + sr_str].copy()
             ans["ref" + sr_str] = temp["leak" + sr_str].copy()
             ans["leak" + sr_str] = temp["leak_convoluted" + sr_str].copy()
-            ans["input" + sr_str] = mix_on_given_snr(ans["snr"], ans["truth" + sr_str], ans["leak" + sr_str])
+            ans["input" + sr_str], _, _ = mix_on_given_snr(ans["snr"], ans["truth" + sr_str], ans["leak" + sr_str])
             if ADD_NOISE:
                 if ans["noise" + sr_str].size < ans["input" + sr_str].size:
                     # If the noise is not long enough we repeat it.
-                    rep_times = ans["input" + sr_str].size // ans["noise" + sr_str] + 1
+                    rep_times = ans["input" + sr_str].size // ans["noise" + sr_str].size + 1
                     ans["noise" + sr_str] = np.tile(ans["noise" + sr_str], rep_times)
                 # Then if noise is longer, chop it
-                ans["noise" + sr_str].resize(ans["input" + sr_str].shape, refcheck=False)
+                ans["noise" + sr_str] = np.resize(ans["noise" + sr_str], ans["input" + sr_str].shape)
 
-                ans["input" + sr_str] = mix_on_given_snr(ans["noise_snr"], ans["input" + sr_str], ans["noise" + sr_str])
+                ans["input" + sr_str], _, _ = \
+                    mix_on_given_snr(ans["noise_snr"], ans["input" + sr_str], ans["noise" + sr_str])
 
             if save_spectrogram:
                 for t in ["truth", "ref", "input"]:
                     ans[t + "_mag" + sr_str], ans[t + "_phase" + sr_str] = stft_routine(ans[t + sr_str], sr)
-
 
         if sync_for_u_net:
             save_content(8192, "_8k")
@@ -270,9 +260,9 @@ def sync_audio(data_type: str,
                 ans["ref" + sr_str].resize((int(sr * clip_length), ), refcheck=False)
                 ans["leak" + sr_str].resize((int(sr * clip_length), ), refcheck=False)
 
-                ans["input" + sr_str] = mix_on_given_snr(ans["snr"], ans["truth" + sr_str], ans["leak" + sr_str])
+                ans["input" + sr_str], _, _ = mix_on_given_snr(ans["snr"], ans["truth" + sr_str], ans["leak" + sr_str])
                 if ADD_NOISE:
-                    ans["input" + sr_str] = \
+                    ans["input" + sr_str], _, _ = \
                         mix_on_given_snr(ans["noise_snr"], ans["input" + sr_str], ans["noise" + sr_str])
 
                 if SAVE_SPECTROGRAM:

@@ -158,8 +158,19 @@ if __name__ == "__main__":
 
         result_wav = inference(target, model, data)
         truth_wav = data["truth"]
-        leak_wav = data["leak"]
-        input_wav = data["input"]
+        remainder_wav = data["leak"]
+        snr = data["snr"]
+        if ADD_NOISE:
+            noise_snr = data["noise_snr"]
+
+        # Get the corresponding remainder component depends on introduced noise or not.
+        input_wav, a, b = mix_on_given_snr(snr, truth_wav, remainder_wav)
+        truth_wav *= a
+        remainder_wav *= b
+        if ADD_NOISE:
+            input_wav, a, b = mix_on_given_snr(noise_snr, input_wav, data["noise"])
+            remainder_wav = data["noise"] * b + remainder_wav * a
+            truth_wav *= a
 
         def get_metric(wav):
             if wav.size > input_wav.size:
@@ -167,8 +178,8 @@ if __name__ == "__main__":
             elif wav.size < input_wav.size:
                 wav = np.pad(wav, (0, input_wav.size - wav.size), "constant", constant_values=0)
             sdr, sir, sar, _ = mir_eval.separation.bss_eval_sources(
-                np.vstack((truth_wav, leak_wav)),
-                np.vstack((wav, input_wav * 2 - wav))
+                np.vstack((truth_wav, remainder_wav)),
+                np.vstack((wav, input_wav - wav))
             )
             return sdr[0], sir[0], sar[0]
 
