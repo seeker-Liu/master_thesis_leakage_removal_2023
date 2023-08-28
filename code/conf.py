@@ -161,3 +161,24 @@ def mix_on_given_snr(snr, signal, noise):
     b = np.sqrt(g ** 2 / (1 + g ** 2))
 
     return a * signal + b * noise, a, b
+
+
+def get_si_sdr(est, ref):
+    # as provided by @Jonathan-LeRoux and slightly adapted for the case of just one reference
+    # and one estimate.
+    # see original code here: https://github.com/sigsep/bsseval/issues/3#issuecomment-494995846
+    eps = np.finfo(est[0].dtype).eps
+    reference = np.expand_dims(ref, -1)
+    estimate = np.expand_dims(est, -1)
+    Rss = np.dot(reference.T, reference)
+
+    # get the scaling factor for clean sources
+    a = (eps + np.dot(reference.T, estimate)) / (Rss + eps)
+
+    e_true = a * reference
+    e_res = estimate - e_true
+
+    Sss = (e_true**2).sum()
+    Snn = (e_res**2).sum()
+
+    return 10 * np.log10((eps+ Sss)/(eps + Snn))

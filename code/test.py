@@ -1,12 +1,9 @@
-import librosa
-
 from conf import *
 
 import tensorflow as tf
 import numpy as np
 import sys
 import shutil
-import mir_eval
 import soundfile
 
 
@@ -149,8 +146,8 @@ if __name__ == "__main__":
     algo_sdrs = []
     for i, path in enumerate(data_files):
         print()
+        i = f"{i:06}"
         print(f"{i}-th input:")
-        data_index = os.path.splitext(os.path.basename(path))[0]
 
         data = np.load(path)
         print(f"Leakage audio path: {data['leak_path']}")
@@ -164,50 +161,37 @@ if __name__ == "__main__":
         if ADD_NOISE:
             noise_snr = data["noise_snr"]
 
-        # Get the corresponding remainder component depends on introduced noise or not.
-        input_wav, a, b = mix_on_given_snr(snr, truth_wav, remainder_wav)
-        truth_wav *= a
-        remainder_wav *= b
-        if ADD_NOISE:
-            input_wav, a, b = mix_on_given_snr(noise_snr, input_wav, data["noise"])
-            remainder_wav = data["noise"] * b + remainder_wav * a
-            truth_wav *= a
-
 
         def get_metric(wav):
-            if wav.size > input_wav.size:
-                wav.resize(input_wav.shape)
-            elif wav.size < input_wav.size:
-                wav = np.pad(wav, (0, input_wav.size - wav.size), "constant", constant_values=0)
-            sdr, sir, sar, _ = mir_eval.separation.bss_eval_sources(
-                np.vstack((truth_wav, remainder_wav)),
-                np.vstack((wav, input_wav - wav))
-            )
-            return sdr[0], sir[0], sar[0]
+            if wav.size > truth_wav.size:
+                wav.resize(truth_wav.shape)
+            elif wav.size < truth_wav.size:
+                wav = np.pad(wav, (0, truth_wav.size - wav.size), "constant", constant_values=0)
+            return get_si_sdr(wav, truth_wav)
 
 
-        sdr, sir, sar = get_metric(result_wav)
-        algo_sdrs.append(sdr)
-        print(f"Result metrics: SDR: {sdr:.5f}, SIR: {sir:.5f}, SAR: {sar:.5f}")
+        si_sdr = get_metric(result_wav)
+        algo_sdrs.append(si_sdr)
+        print(f"Result metrics: SI-SDR: {si_sdr:.5f}")
 
         output_dir = os.path.join(MODEL_DIRS[target], "test_output")
         try:
             os.mkdir(output_dir)
         except FileExistsError:
             pass
-        output_dir = os.path.join(output_dir, data_index)
+        output_dir = os.path.join(output_dir, i)
         try:
             shutil.rmtree(output_dir)
         except FileNotFoundError:
             pass
         os.mkdir(output_dir)
-        soundfile.write(os.path.join(output_dir, data_index + "_output.wav"),
+        soundfile.write(os.path.join(output_dir, i + "_output.wav"),
                         result_wav, SR)
-        soundfile.write(os.path.join(output_dir, data_index + "_input.wav"),
+        soundfile.write(os.path.join(output_dir, i + "_input.wav"),
                         data["input"], SR)
-        soundfile.write(os.path.join(output_dir, data_index + "_ref.wav"),
+        soundfile.write(os.path.join(output_dir, i + "_ref.wav"),
                         data["ref"], SR)
-        soundfile.write(os.path.join(output_dir, data_index + "_truth.wav"),
+        soundfile.write(os.path.join(output_dir, i + "_truth.wav"),
                         data["truth"], SR)
 
     print(f"Average SDR of tested algo: {np.mean(algo_sdrs)}")

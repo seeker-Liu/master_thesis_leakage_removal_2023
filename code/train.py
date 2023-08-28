@@ -19,9 +19,9 @@ if __name__ == "__main__":
     for arg in sys.argv[1:]:
         if arg == "--no-gpu":
             no_gpu = True
-        elif arg == "-c" or arg == "-continue":
+        elif arg == "-c" or arg == "--continue":
             continue_train = True
-        elif arg == "-b" or arg == "-baseline":
+        elif arg == "-b" or arg == "--baseline":
             target = "baseline"
         elif arg == "--wave-u-net":
             target = "wave-u-net"

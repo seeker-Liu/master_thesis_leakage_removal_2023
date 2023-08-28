@@ -97,6 +97,7 @@ class BaselineModel(tf.keras.Model):
         sb_out = tf.reshape(sb_out, (-1, F, T, 2))
         # Remove first two frames because 2-frame look-ahead
         sb_out = sb_out[:, :, 2:, :]
+        sb_out = tf.transpose(sb_out, perm=(0, 2, 1, 3))
 
         return sb_out
 
