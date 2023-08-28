@@ -1,3 +1,5 @@
+import shutil
+
 from conf import *
 
 import tf_dataset
@@ -91,6 +93,7 @@ if __name__ == "__main__":
             model = u_net_baseline()
             model.compile(optimizer="adam", loss="mean_absolute_error")
 
+    shutil.rmtree(ckpt_folder)
     try:
         os.mkdir(ckpt_folder)
     except FileExistsError:
@@ -100,7 +103,7 @@ if __name__ == "__main__":
     train_dataset = tf_dataset.get_dataset("train", **dataset_param)
     valid_dataset = tf_dataset.get_dataset("validation", **dataset_param)
 
-    early_stop_min_delta = 1e-5 if target == "original" or target == "baseline" else 1e-7
+    early_stop_min_delta = 1e-7 if target.startswith("wave-u-net") else 1e-5
     history = model.fit(train_dataset, epochs=100, validation_data=valid_dataset,
                         callbacks=(tf.keras.callbacks.TerminateOnNaN(),
                                    tf.keras.callbacks.EarlyStopping(

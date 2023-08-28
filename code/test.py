@@ -29,15 +29,15 @@ def inference_wave_u_net(model, data):
 
     left_margin = (WAVE_U_NET_INPUT_LENGTH - WAVE_U_NET_OUTPUT_LENGTH) // 2
     for i in range(0, input_wav.size, WAVE_U_NET_OUTPUT_LENGTH):
-        input_seg = np.zeros((WAVE_U_NET_INPUT_LENGTH, ), np.float32)
-        ref_seg = np.zeros((WAVE_U_NET_INPUT_LENGTH, ), np.float32)
+        input_seg = np.zeros((WAVE_U_NET_INPUT_LENGTH,), np.float32)
+        ref_seg = np.zeros((WAVE_U_NET_INPUT_LENGTH,), np.float32)
 
         if i < left_margin:
             input_seg[left_margin - i: left_margin] = input_wav[0:i]
             ref_seg[left_margin - i: left_margin] = ref_wav[0:i]
         else:
-            input_seg[0:left_margin] = input_wav[i-left_margin:i]
-            ref_seg[0:left_margin] = ref_wav[i-left_margin:i]
+            input_seg[0:left_margin] = input_wav[i - left_margin:i]
+            ref_seg[0:left_margin] = ref_wav[i - left_margin:i]
 
         if WAVE_U_NET_INPUT_LENGTH - left_margin >= input_wav.size - i:
             input_seg[left_margin:left_margin + input_wav.size - i] = input_wav[i:]
@@ -75,14 +75,15 @@ def inference_u_net(model, data):
             else:
                 result_mag[padding_edge: src_mag.shape[0] - i + padding_edge, :] = src_mag[i:, :]
             return np.expand_dims(result_mag, (0, -1))
+
         input_seg = fetch_segment(input_mag)
         ref_seg = fetch_segment(ref_mag)
 
+        result_seg = np.squeeze(model((input_seg, ref_seg), training=False))
         if i + valid_frames <= input_mag.shape[0]:
-            ans_mag[i: i+valid_frames, :] = \
-                np.squeeze(model((input_seg, ref_seg)))[padding_edge: padding_edge + valid_frames, :]
+            ans_mag[i: i + valid_frames, :] = result_seg[padding_edge: padding_edge + valid_frames, :]
         else:
-            ans_mag[i:] = np.squeeze(model((input_seg, ref_seg)))[padding_edge: padding_edge + input_mag.shape[0] - i, :]
+            ans_mag[i:] = result_seg[padding_edge: padding_edge + input_mag.shape[0] - i, :]
 
     result_wav = istft_routine(ans_mag, data["input_phase_8k"], 8192)
     result_wav = librosa.resample(result_wav, orig_sr=8192, target_sr=44100)
@@ -172,6 +173,7 @@ if __name__ == "__main__":
             remainder_wav = data["noise"] * b + remainder_wav * a
             truth_wav *= a
 
+
         def get_metric(wav):
             if wav.size > input_wav.size:
                 wav.resize(input_wav.shape)
@@ -182,6 +184,7 @@ if __name__ == "__main__":
                 np.vstack((wav, input_wav - wav))
             )
             return sdr[0], sir[0], sar[0]
+
 
         sdr, sir, sar = get_metric(result_wav)
         algo_sdrs.append(sdr)

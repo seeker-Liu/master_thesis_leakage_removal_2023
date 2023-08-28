@@ -81,9 +81,11 @@ def u_net(inputs=(Input((128, 512, 1), ), Input((128, 512, 1), ))):
 
     deconv12 = Concatenate(axis=3)([deconv11, conv1, ref_conv1])
     deconv12 = Deconv2D(1, 5, strides=2, padding='same')(deconv12)
-    deconv12 = Activation('relu')(deconv12)
+    deconv12 = Activation('sigmoid')(deconv12)
 
-    model = Model(inputs=inputs, outputs=deconv12)
+    output = deconv12 * inputs[0]
+
+    model = Model(inputs=inputs, outputs=output)
     # model.summary()
     return model
 

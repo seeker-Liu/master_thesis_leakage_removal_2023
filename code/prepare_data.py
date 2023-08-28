@@ -10,6 +10,20 @@ import pretty_midi
 import librosa
 
 
+def get_mango_list() -> list:
+    ans = []
+    mango_dir = os.path.join(DATASET_DIR, "MangoFuture", "midi")
+    for piece in os.listdir(mango_dir):
+        piece_path = os.path.join(mango_dir, piece)
+        if os.path.isdir(piece_path):
+            truth_midi_path = os.path.join(piece_path, "独奏乐谱_violin_0.midi")
+            leak_midi_path = os.path.join(piece_path, "伴奏乐谱_piano_0.midi")
+            ans.append({"truth": (truth_midi_path, 0, VIOLIN_PROGRAM_NUM),
+                        "leak": (leak_midi_path, 1, PIANO_PROGRAM_NUM)})
+
+    return ans
+
+
 def get_sync_list() -> list:
     ans = []
     bach10_dir = os.path.join(DATASET_DIR, "Bach10_v1.1")
@@ -37,16 +51,7 @@ def get_sync_list() -> list:
                 ans.append({"truth": (midi_path, vn_c, VIOLIN_PROGRAM_NUM),
                             "leak": (midi_path, fl_c, FLUTE_PROGRAM_NUM)})
 
-    mango_dir = os.path.join(DATASET_DIR, "MangoFuture", "midi")
-    for piece in os.listdir(mango_dir):
-        piece_path = os.path.join(mango_dir, piece)
-        if os.path.isdir(piece_path):
-            truth_midi_path = os.path.join(piece_path, "独奏乐谱_violin_0.midi")
-            leak_midi_path = os.path.join(piece_path, "伴奏乐谱_piano_0.midi")
-            ans.append({"truth": (truth_midi_path, 0, VIOLIN_PROGRAM_NUM),
-                        "leak": (leak_midi_path, 1, PIANO_PROGRAM_NUM)})
-
-    return ans
+    return ans + get_mango_list()
 
 
 def get_test_list() -> list:
@@ -116,7 +121,7 @@ def get_random_snr():
 
 
 def get_random_noise_snr():
-    return random.random() * -18 + 3  # [-15, 3] dB
+    return random.random() * 18 - 3  # [-3, 15] dB
 
 
 def shake_midi(midi_channel: pretty_midi.Instrument):
