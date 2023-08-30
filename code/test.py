@@ -159,7 +159,8 @@ if __name__ == "__main__":
         physical_devices = tf.config.list_physical_devices('GPU')
         tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
-    test_data_dir = os.path.join(TEST_DIR, "regular" if not target.startswith("u-net") else "u_net")
+    # test_data_dir = os.path.join(TEST_DIR, "regular" if not target.startswith("u-net") else "u_net")
+    test_data_dir = TEST_DIR
     data_files = [os.path.join(test_data_dir, np_f) for np_f in os.listdir(test_data_dir)]
 
     # ckpt_folder = os.path.join(MODEL_DIRS[target], "checkpoint")
