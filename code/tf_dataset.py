@@ -34,8 +34,8 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_inp
             ref_mag = data["ref_mag" + sr_postfix_str]
             truth_mag = data["truth_mag" + sr_postfix_str]
             truth_phase = data["truth_phase" + sr_postfix_str]
-            input_complex = input_mag * np.exp(input_phase * 1j)
-            truth_complex = truth_mag * np.exp(truth_phase * 1j)
+            input_complex = input_mag * input_phase
+            truth_complex = truth_mag * truth_phase
 
             return input_mag, ref_mag, build_ideal_mask(input_complex, truth_complex)
 
@@ -46,10 +46,11 @@ def get_dataset(t: str, use_spectrogram, use_irm, sr, sr_postfix_str, target_inp
                 return data["input_mag" + sr_postfix_str], \
                     data["ref_mag" + sr_postfix_str], data["truth_mag" + sr_postfix_str]
             else:
-                input_mag = stft_routine(data["input" + sr_postfix_str], sr)
-                ref_mag = stft_routine(data["ref" + sr_postfix_str], sr)
-                truth_mag = stft_routine(data["truth" + sr_postfix_str], sr)
+                input_mag = stft_routine(data["input" + sr_postfix_str], sr)[0]
+                ref_mag = stft_routine(data["ref" + sr_postfix_str], sr)[0]
+                truth_mag = stft_routine(data["truth" + sr_postfix_str], sr)[0]
                 return input_mag, ref_mag, truth_mag
+
     else:  # For wave-u-net
         # Get the slice of the center part.
         def get_slices(total_len, target_length):

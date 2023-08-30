@@ -272,7 +272,10 @@ def sync_audio(data_type: str,
 
                 if SAVE_SPECTROGRAM:
                     for t in ["truth", "ref", "input"]:
-                        ans[t + "_mag" + sr_str], ans[t + "_phase" + sr_str] = stft_routine(ans[t + sr_str], sr)
+                        mag, phase = stft_routine(ans[t + sr_str], sr)
+                        ans[t + "_mag" + sr_str] = mag
+                        if t == "input":
+                            ans[t + "_phase" + sr_str] = phase
 
             if sync_for_u_net:
                 save_content(8192, "_8k")

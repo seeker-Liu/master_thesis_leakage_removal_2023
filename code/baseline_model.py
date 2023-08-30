@@ -141,8 +141,8 @@ def compress_cIRM(mask, K=10, C=0.1):
 
 
 def decompress_cIRM(mask, K=10, limit=9.9):
-    mask = tf.math.maximum(tf.math.minimum(mask, limit), -limit)
-    mask = -K * tf.math.log((K - mask) / (K + mask))
+    mask = np.maximum(np.minimum(mask, limit), -limit)
+    mask = -K * np.log((K - mask) / (K + mask))
     return mask
 
 
@@ -158,6 +158,7 @@ def build_ideal_mask(mixed, truth):
 
 
 def result_from_mask(mixed, mask):
+    mask = decompress_cIRM(mask)
     enhanced_real = mask[..., 0] * mixed.real - mask[..., 1] * mixed.imag
     enhanced_imag = mask[..., 1] * mixed.real + mask[..., 0] * mixed.imag
     return enhanced_real + enhanced_imag*1j

@@ -5,6 +5,7 @@ import numpy as np
 import sys
 import shutil
 import soundfile
+import baseline_model
 
 
 def inference_original(model, data):
@@ -87,6 +88,30 @@ def inference_u_net(model, data):
     return result_wav
 
 
+def inference_baseline(model, data):
+    input_mag = data["input_mag_16k"]
+    ref_mag = data["ref_mag_16k"]
+    ans_mask = np.empty(input_mag.shape + (2,), dtype=np.complex64)
+
+    input_frame_length = 313
+    frame_hop = 300
+    for i in range(0, input_mag.shape[0], frame_hop):
+        def fetch_segment(src_mag):
+            seg = np.zeros((313, 257), dtype=src_mag.dtype)
+            seg[0: input_mag.shape[0] - i, :] = src_mag[i:i + input_frame_length, :]
+            return np.expand_dims(seg, 0)
+        input_seg = fetch_segment(input_mag)
+        ref_seg = fetch_segment(ref_mag)
+        mask = model((input_seg, ref_seg), training=False)[0, :, :, :]
+        ans_mask[i:i+frame_hop, :, :] = mask[0: min(input_mag.shape[0] - i, frame_hop), :, :]
+
+    input_spec = input_mag * data["input_phase_16k"]
+    result_wav = istft_routine_with_spec(baseline_model.result_from_mask(input_spec, ans_mask), 16000)
+    result_wav = librosa.resample(result_wav, orig_sr=16000, target_sr=SR)
+    return result_wav
+
+
+
 def inference(target: str, model, data):
     """
     return tuples (truth_waveform, leak_waveform, result_waveform)
@@ -94,7 +119,7 @@ def inference(target: str, model, data):
     if target == "original":
         return inference_original(model, data)
     elif target == "baseline":
-        return 0
+        return inference_baseline(model, data)
     elif target == "wave-u-net":
         return inference_wave_u_net(model, data)
     elif target == "wave-u-net-baseline":

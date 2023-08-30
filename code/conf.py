@@ -129,15 +129,17 @@ def stft_routine(wav, sr):
 
 
 def istft_routine(mag, phase, sr):
-    params = STFT_PARAMS[sr]
     spec = (mag * phase).T
+    return istft_routine_with_spec(spec, sr)
 
+
+def istft_routine_with_spec(spec, sr):
+    params = STFT_PARAMS[sr]
     if sr == 8192:  # Append zero to the cut last freq bin
         temp = np.zeros((513, spec.shape[1]), dtype=np.complex64)
         temp[0:512, :] = spec
         spec = temp
     return librosa.istft(spec, **params)
-
 
 def grow_array(src, target):
     tmp = np.zeros_like(target)
