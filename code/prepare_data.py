@@ -156,7 +156,6 @@ def add_reverb(audio, ir):
     return audio
 
 
-
 def sync_audio(data_type: str,
                src_info: dict[str: tuple[str, int, int]],
                clip_length: float = AUDIO_CLIP_LENGTH,
@@ -227,13 +226,11 @@ def sync_audio(data_type: str,
                 for t in ["truth", "ref", "input"]:
                     ans[t + "_mag" + sr_str], ans[t + "_phase" + sr_str] = stft_routine(ans[t + sr_str], sr)
 
+        save_content(SR, "")
+        if SAVE_16K:
+            save_content(16000, "_16k")
         if sync_for_u_net:
             save_content(8192, "_8k")
-            save_content(SR, "", False)
-        else:
-            save_content(SR, "")
-            if SAVE_16K:
-                save_content(16000, "_16k")
         answers.append(ans)
 
     else:
@@ -373,11 +370,15 @@ if __name__ == '__main__':
                     j += 1
                     np.savez(out_path, **audio)
 
-        if for_regular:
-            print("Regular part.")
-            sync_and_save(os.path.join(DIRS[t], "regular"), data_lists[t], {})
-        if for_u_net:
-            print("Special for u-net.")
-            sync_and_save(os.path.join(DIRS[t], "u_net"), data_lists[t],
-                          {"clip_length": 12.1, "clip_hop": 12.1/2, "sync_for_u_net": True})
+        if t != "test":
+            if for_regular:
+                print("Regular part.")
+                sync_and_save(os.path.join(DIRS[t], "regular"), data_lists[t], {})
+            if for_u_net:
+                print("Special for u-net.")
+                sync_and_save(os.path.join(DIRS[t], "u_net"), data_lists[t],
+                              {"clip_length": 12.1, "clip_hop": 12.1/2, "sync_for_u_net": True})
+        else:
+            print("Test data, regular and u-net use same setup")
+            sync_and_save(DIRS[t], data_lists[t], {})
 
