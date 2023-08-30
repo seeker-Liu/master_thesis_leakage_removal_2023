@@ -1,16 +1,6 @@
 import tensorflow as tf
 
 
-def old_get_model():
-    model = tf.keras.Sequential()
-    model.add(tf.keras.layers.Dense(512, activation="relu", input_shape=(None, 2049*2)))
-    model.add(tf.keras.layers.GRU(256, return_sequences=True))
-    model.add(tf.keras.layers.GRU(256, return_sequences=True))
-    model.add(tf.keras.layers.Dense(2049, activation="sigmoid"))
-
-    return model
-
-
 def get_model():
     mixed_spec = tf.keras.layers.Input(shape=(None, 2049), name="mixed_spec")
     ref_spec = tf.keras.layers.Input(shape=(None, 2049), name="ref_spec")

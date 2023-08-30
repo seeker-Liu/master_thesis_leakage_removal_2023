@@ -137,9 +137,10 @@ if __name__ == "__main__":
     test_data_dir = os.path.join(TEST_DIR, "regular" if not target.startswith("u-net") else "u_net")
     data_files = [os.path.join(test_data_dir, np_f) for np_f in os.listdir(test_data_dir)]
 
-    ckpt_folder = os.path.join(MODEL_DIRS[target], "checkpoint")
-    last_model_name = sorted(os.listdir(ckpt_folder))[-1]
-    model_path = os.path.join(ckpt_folder, last_model_name)
+    # ckpt_folder = os.path.join(MODEL_DIRS[target], "checkpoint")
+    # last_model_name = sorted(os.listdir(ckpt_folder))[-1]
+    # model_path = os.path.join(ckpt_folder, last_model_name)
+    model_path = os.path.join(MODEL_DIRS[target], "trained_model")
     print(f"Model path: {model_path}")
     model = tf.keras.models.load_model(model_path)
 
@@ -194,4 +195,4 @@ if __name__ == "__main__":
         soundfile.write(os.path.join(output_dir, i + "_truth.wav"),
                         data["truth"], SR)
 
-    print(f"Average SDR of tested algo: {np.mean(algo_sdrs)}")
+    print(f"Average SI-SDR of tested algo: {np.mean(algo_sdrs)}")

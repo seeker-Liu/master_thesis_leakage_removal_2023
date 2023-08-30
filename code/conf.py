@@ -29,7 +29,7 @@ MODEL_DIRS = {
 SR = 44100
 
 SAVE_SPECTROGRAM = True
-SAVE_16K = False
+SAVE_16K = True
 ADD_NOISE = True
 
 URMP_VIOLIN_CLARINET_PIECES = {17: (0, 2), 19: (1, 0), 37: (1, 3)}
@@ -71,7 +71,7 @@ DATASET_PARAMS = {
         "sr_postfix_str": "_16k",
         "target_input_length": None,
         "target_output_length": None,
-        "batch_size": BATCH_SIZE,
+        "batch_size": 2,
         "output_data_mapper": lambda x1, x2, y: ((x1, x2), y)
     },
     "wave-u-net": {
@@ -164,9 +164,7 @@ def mix_on_given_snr(snr, signal, noise):
 
 
 def get_si_sdr(est, ref):
-    # as provided by @Jonathan-LeRoux and slightly adapted for the case of just one reference
-    # and one estimate.
-    # see original code here: https://github.com/sigsep/bsseval/issues/3#issuecomment-494995846
+    # Implementation from https://github.com/aliutkus/speechmetrics/blob/master/speechmetrics/relative/sisdr.py
     eps = np.finfo(est[0].dtype).eps
     reference = np.expand_dims(ref, -1)
     estimate = np.expand_dims(est, -1)

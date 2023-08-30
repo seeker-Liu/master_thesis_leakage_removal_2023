@@ -288,6 +288,11 @@ def sync_audio(data_type: str,
 
 
 if __name__ == '__main__':
+    try:
+        os.mkdir(DATA_DIR)
+    except FileExistsError:
+        pass
+
     TYPES = ["train", "valid", "test"]
     DIRS = [TRAIN_DIR, VALID_DIR, TEST_DIR]
     DIRS = {x: y for x, y in zip(TYPES, DIRS)}

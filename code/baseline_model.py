@@ -13,7 +13,7 @@ class Unfold(tf.keras.layers.Layer):
         self.N = num_neighbor
         self.paddings = tf.constant([[0, 0], [0, 0], [self.N, self.N]])
 
-    def call(self, x):
+    def call(self, x, *args, **kwargs):
         """
         :param x: 3D tensor, shape: (Batch_index, Time_index, Freq_index)
         :return: unfolded_tensor: 4D, shape: (Batch, Time, Freq, Freq_band)
@@ -36,7 +36,7 @@ class NormLayer3D(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         super(NormLayer3D, self).__init__(**kwargs)
 
-    def call(self, x):
+    def call(self, x, *args, **kwargs):
         mu = tf.reduce_mean(x, axis=(1, 2), keepdims=True)
         return x / (mu + 1e-5)
 
@@ -45,7 +45,7 @@ class NormLayer4D(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         super(NormLayer4D, self).__init__(**kwargs)
 
-    def call(self, x):
+    def call(self, x, *args, **kwargs):
         mu = tf.reduce_mean(x, axis=(1, 2, 3), keepdims=True)
         return x / (mu + 1e-5)
 
@@ -59,11 +59,11 @@ class BaselineModel(tf.keras.Model):
         self.fb_lstm_1 = tf.keras.layers.LSTM(512, return_sequences=True)
         self.fb_lstm_2 = tf.keras.layers.LSTM(512, return_sequences=True)
         self.fb_dense = tf.keras.layers.Dense(257, activation="relu")
-        self.sb_lstm_1 = tf.keras.layers.LSTM(384, return_sequences=True)
-        self.sb_lstm_2 = tf.keras.layers.LSTM(384, return_sequences=True)
-        self.sb_dense = tf.keras.layers.Dense(2, activation=None)
+        self.sb_lstm_1 = tf.keras.layers.TimeDistributed(tf.keras.layers.LSTM(384, return_sequences=True))
+        self.sb_lstm_2 = tf.keras.layers.TimeDistributed(tf.keras.layers.LSTM(384, return_sequences=True))
+        self.sb_dense = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(2, activation=None))
 
-    def call(self, inputs):
+    def call(self, inputs, training=False, mask=None):
         mag, ref_mag = inputs
         # Pad 2 frames of zeros at the end for 2-frame look ahead
         mag = tf.pad(mag, [[0, 0], [0, 2], [0, 0]])
@@ -86,19 +86,15 @@ class BaselineModel(tf.keras.Model):
         sb_input = tf.concat([fb_out_unfold, mag_unfold, ref_mag_unfold], axis=-1)
         # [B, T, F, F_s] -> [B, F, T, F_s]
         sb_input = tf.transpose(sb_input, perm=(0, 2, 1, 3))
-        B, F, T, F_s = sb_input.get_shape().as_list()
-        # [B, F, T, F_s] -> [B*F, T, F_s]
-        sb_input = tf.reshape(sb_input, (-1, T, F_s))
         sb1 = self.sb_lstm_1(sb_input)
         sb2 = self.sb_lstm_2(sb1)
         sb_out = self.sb_dense(sb2)
 
-        # sb_out: [B*F, T, 2] -> [B, F, T, 2]
-        sb_out = tf.reshape(sb_out, (-1, F, T, 2))
         # Remove first two frames because 2-frame look-ahead
         sb_out = sb_out[:, :, 2:, :]
         sb_out = tf.transpose(sb_out, perm=(0, 2, 1, 3))
 
+        # Output is complex ideal ratio mask.
         return sb_out
 
     def summary(self):
@@ -167,10 +163,18 @@ def result_from_mask(mixed, mask):
     return enhanced_real + enhanced_imag*1j
 
 
+def get_baseline_model():
+    model = BaselineModel()
+    i1 = tf.keras.Input(shape=(313, 257), dtype=np.float32)
+    i2 = tf.keras.Input(shape=(313, 257), dtype=np.float32)
+    model = tf.keras.Model(inputs=[i1, i2], outputs=model.call([i1, i2]))
+    return model
+
+
 if __name__ == "__main__":
-    tf.config.set_visible_devices([], 'GPU')
+    # tf.config.set_visible_devices([], 'GPU')
 
     model = BaselineModel()
     model.summary()
-    model([tf.constant(0, shape=(16, 313, 257), dtype=np.float32),
-           tf.constant(0, shape=(16, 313, 257), dtype=np.float32)], training=True)
+    model([tf.constant(0, shape=(4, 313, 257), dtype=np.float32),
+           tf.constant(0, shape=(4, 313, 257), dtype=np.float32)], training=True)

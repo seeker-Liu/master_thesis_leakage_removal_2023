@@ -56,7 +56,7 @@ if __name__ == "__main__":
         model = tf.keras.models.load_model(os.path.join(ckpt_folder, last_model_folder_name))
     else:
         if target == "baseline":
-            model = baseline_model.BaselineModel()
+            model = baseline_model.get_baseline_model()
             optimizer = tf.keras.optimizers.Adam()
             model.compile(optimizer=optimizer,
                           loss="mse")

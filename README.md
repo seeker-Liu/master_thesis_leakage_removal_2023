@@ -9,3 +9,6 @@ Modification is mine.
 Implementation of original u-net is from: https://github.com/Zhz1997/Singing-voice-speration-with-U-Net
 
 Modification is mine.
+
+#### SI-SDR implementation:
+https://github.com/aliutkus/speechmetrics/blob/master/speechmetrics/relative/sisdr.py
