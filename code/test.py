@@ -106,7 +106,7 @@ def inference_baseline(model, data):
         ans_mask[i:i+frame_hop, :, :] = mask[0: min(input_mag.shape[0] - i, frame_hop), :, :]
 
     input_spec = input_mag * data["input_phase_16k"]
-    result_wav = istft_routine_with_spec(baseline_model.result_from_mask(input_spec, ans_mask), 16000)
+    result_wav = istft_routine_with_spec(baseline_model.result_from_mask(input_spec, ans_mask).T, 16000)
     result_wav = librosa.resample(result_wav, orig_sr=16000, target_sr=SR)
     return result_wav
 
