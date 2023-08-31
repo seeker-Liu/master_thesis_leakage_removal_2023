@@ -5,6 +5,7 @@ import numpy as np
 import sys
 import shutil
 import soundfile
+import time
 import baseline_model
 
 
@@ -111,11 +112,7 @@ def inference_baseline(model, data):
     return result_wav
 
 
-
 def inference(target: str, model, data):
-    """
-    return tuples (truth_waveform, leak_waveform, result_waveform)
-    """
     if target == "original":
         return inference_original(model, data)
     elif target == "baseline":
@@ -133,6 +130,8 @@ def inference(target: str, model, data):
 
 
 if __name__ == "__main__":
+    assert ADD_NOISE, "Now test routine is rewrite and no longer support no noise case."
+
     no_gpu = False
     target = None
     for arg in sys.argv[1:]:
@@ -170,24 +169,36 @@ if __name__ == "__main__":
     print(f"Model path: {model_path}")
     model = tf.keras.models.load_model(model_path)
 
+    output_dir = os.path.join(MODEL_DIRS[target], "test_output")
+    try:
+        shutil.rmtree(output_dir)
+    except FileNotFoundError:
+        pass
+    os.mkdir(output_dir)
+
     algo_sdrs = []
+    process_times = []
     for i, path in enumerate(data_files):
         print()
         i = f"{i:06}"
         print(f"{i}-th input:")
 
-        data = np.load(path)
+        data = dict(np.load(path))
         print(f"Leakage audio path: {data['leak_path']}")
         print(f"Target audio path: {data['truth_path']}")
         print(f"Starting point: {data['starting_seconds']}")
 
-        result_wav = inference(target, model, data)
+        sub_output_dir = os.path.join(output_dir, i)
+        try:
+            shutil.rmtree(sub_output_dir)
+        except FileNotFoundError:
+            pass
+        os.mkdir(sub_output_dir)
+        soundfile.write(os.path.join(sub_output_dir, i + "_ref.wav"), data["ref"], SR)
+        soundfile.write(os.path.join(sub_output_dir, i + "_truth.wav"), data["truth"], SR)
+
         truth_wav = data["truth"]
         remainder_wav = data["leak"]
-        snr = data["snr"]
-        if ADD_NOISE:
-            noise_snr = data["noise_snr"]
-
 
         def get_metric(wav):
             if abs(wav.size - truth_wav.size) > 10000:
@@ -198,29 +209,74 @@ if __name__ == "__main__":
                 wav = np.pad(wav, (0, truth_wav.size - wav.size), "constant", constant_values=0)
             return get_si_sdr(wav, truth_wav)
 
+        si_sdr_matrix = []
+        for snr in TEST_SNRS:
+            si_sdrs = []
+            for noise_snr in TEST_NOISE_SNRS:
+                def prepare_data(sr, sr_str):
+                    data["input" + sr_str], _, _ = mix_on_given_snr(snr, data["truth" + sr_str], data["leak" + sr_str])
+                    data["input" + sr_str], _, _ = \
+                        mix_on_given_snr(noise_snr, data["input" + sr_str], data["noise" + sr_str])
 
-        si_sdr = get_metric(result_wav)
-        algo_sdrs.append(si_sdr)
-        print(f"Result metrics: SI-SDR: {si_sdr:.5f}")
+                def prepare_spectrogram(sr, sr_str):
+                    for t in ["ref", "input"]:
+                        mag, phase = stft_routine(data[t + sr_str], sr)
+                        data[t + "_mag" + sr_str] = mag
+                        if t == "input":
+                            data[t + "_phase" + sr_str] = phase
 
-        output_dir = os.path.join(MODEL_DIRS[target], "test_output")
-        try:
-            os.mkdir(output_dir)
-        except FileExistsError:
-            pass
-        output_dir = os.path.join(output_dir, i)
-        try:
-            shutil.rmtree(output_dir)
-        except FileNotFoundError:
-            pass
-        os.mkdir(output_dir)
-        soundfile.write(os.path.join(output_dir, i + "_output.wav"),
-                        result_wav, SR)
-        soundfile.write(os.path.join(output_dir, i + "_input.wav"),
-                        data["input"], SR)
-        soundfile.write(os.path.join(output_dir, i + "_ref.wav"),
-                        data["ref"], SR)
-        soundfile.write(os.path.join(output_dir, i + "_truth.wav"),
-                        data["truth"], SR)
+                if target == "original":
+                    prepare_data(SR, "")
+                elif target == "baseline":
+                    prepare_data(16000, "_16k")
+                elif target == "u-net":
+                    prepare_data(8192, "_8k")
+                elif target == "wave-u-net":
+                    prepare_data(SR, "")
 
-    print(f"Average SI-SDR of tested algo: {np.mean(algo_sdrs)}")
+                tic = time.perf_counter()
+
+                if target == "original":
+                    prepare_spectrogram(SR, "")
+                elif target == "baseline":
+                    prepare_spectrogram(16000, "_16k")
+                elif target == "u-net":
+                    prepare_spectrogram(8192, "_8k")
+                result_wav = inference(target, model, data)
+
+                toc = time.perf_counter()
+                process_times.append(toc - tic)
+
+                sdr = get_metric(result_wav)
+                si_sdrs.append(sdr)
+
+                soundfile.write(os.path.join(sub_output_dir,  f"SNR{snr}_NoiseSNR{noise_snr}_output.wav"),
+                                result_wav, SR)
+                input_file_name = os.path.join(sub_output_dir, f"SNR{snr}_NoiseSNR{noise_snr}_input.wav")
+                if target == "original" or target == "wave-u-net":
+                    soundfile.write(input_file_name, data["input"], SR)
+                elif target == "baseline":
+                    soundfile.write(input_file_name, data["input_16k"], 16000)
+                elif target == "u-net":
+                    soundfile.write(input_file_name, data["input_8k"], 8192)
+
+            si_sdr_matrix.append(si_sdrs)
+
+        algo_sdrs.append(si_sdr_matrix)
+        # print(f"Result metrics: SI-SDR: {si_sdr:.5f}")
+
+        # output_dir = os.path.join(output_dir, i)
+        # try:
+        #     shutil.rmtree(output_dir)
+        # except FileNotFoundError:
+        #     pass
+        # os.mkdir(output_dir)
+
+    # print(f"Average SI-SDR of tested algo: {np.mean(algo_sdrs)}")
+    algo_sdrs = np.array(algo_sdrs)
+    np.save(os.path.join(output_dir, "SDRMatrix.npy"), algo_sdrs)
+    process_times = np.array(process_times)
+
+    print(f"Finished, average SI-SDR of all cases: {np.mean(algo_sdrs)}, result shape: {algo_sdrs.shape}")
+    print(f"Average process time for each instance: {np.mean(process_times)}, "
+          f"variance of time usage: {np.var(process_times)}")

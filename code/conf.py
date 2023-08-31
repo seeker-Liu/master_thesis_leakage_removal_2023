@@ -53,6 +53,11 @@ STFT_PARAMS = {16000: {"n_fft": 512, "hop_length": 256, "window": "hann", "cente
                44100: {"n_fft": 4096, "hop_length": 1024, "window": "hann", "center": True},
                8192: {"n_fft": 1024, "hop_length": 768, "window": "hann", "center": False}}
 
+
+TEST_SNRS = (6, 3, 0, -3, -6)
+TEST_NOISE_SNRS = (18, 15, 12, 9, 6, 3, 0, -3)
+
+
 DATASET_PARAMS = {
     "original": {
         "use_spectrogram": True,

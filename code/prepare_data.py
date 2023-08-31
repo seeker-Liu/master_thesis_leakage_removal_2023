@@ -195,46 +195,57 @@ def sync_audio(data_type: str,
 
     answers = []
     if data_type == "test":
-        # Save whole audio in one.
-        ans = {"truth_path": temp["truth_path"], "leak_path": temp["leak_path"], "starting_seconds": 0,
-               "snr": get_random_snr()}
-        if ADD_NOISE:
-            ans["noise"] = random.choice(noises).copy()
-            if sync_for_u_net:
-                ans["noise_8k"] = librosa.resample(ans["noise"], orig_sr=SR, target_sr=8192)
-            if SAVE_16K:
-                ans["noise_16k"] = librosa.resample(ans["noise"], orig_sr=SR, target_sr=16000)
-            ans["noise_snr"] = get_random_noise_snr()
-
-        def save_content(sr, sr_str, save_spectrogram=SAVE_SPECTROGRAM):
-            ans["truth" + sr_str] = temp["truth" + sr_str].copy()
-            ans["ref" + sr_str] = temp["leak" + sr_str].copy()
-            ans["leak" + sr_str] = temp["leak_convoluted" + sr_str].copy()
-            ans["input" + sr_str], _, _ = mix_on_given_snr(ans["snr"], ans["truth" + sr_str], ans["leak" + sr_str])
+        # Chop the audios into 30-second fragments.
+        i = 0
+        while i < temp["truth"].size / SR - clip_length / 2:  # Chop down the last remainder if it is shorter than half
+            ans = {"truth_path": temp["truth_path"], "leak_path": temp["leak_path"], "starting_seconds": i,
+                   "snr": get_random_snr()}
             if ADD_NOISE:
-                if ans["noise" + sr_str].size < ans["input" + sr_str].size:
-                    # If the noise is not long enough we repeat it.
-                    rep_times = ans["input" + sr_str].size // ans["noise" + sr_str].size + 1
-                    ans["noise" + sr_str] = np.tile(ans["noise" + sr_str], rep_times)
-                # Then if noise is longer, chop it
-                ans["noise" + sr_str] = np.resize(ans["noise" + sr_str], ans["input" + sr_str].shape)
+                ans["noise"] = random.choice(noises).copy()
+                if sync_for_u_net:
+                    ans["noise_8k"] = librosa.resample(ans["noise"], orig_sr=SR, target_sr=8192)
+                if SAVE_16K:
+                    ans["noise_16k"] = librosa.resample(ans["noise"], orig_sr=SR, target_sr=16000)
+                ans["noise_snr"] = get_random_noise_snr()
 
-                ans["input" + sr_str], _, _ = \
-                    mix_on_given_snr(ans["noise_snr"], ans["input" + sr_str], ans["noise" + sr_str])
+            def save_content(sr, sr_str, save_spectrogram=SAVE_SPECTROGRAM):
+                index_range = slice(int(i * sr), int((i + clip_length) * sr))
+                ans["truth" + sr_str] = temp["truth" + sr_str][index_range].copy()
+                ans["ref" + sr_str] = temp["leak" + sr_str][index_range].copy()
+                ans["leak" + sr_str] = temp["leak_convoluted" + sr_str][index_range].copy()
 
-            if save_spectrogram:
-                for t in ["truth", "ref", "input"]:
-                    mag, phase = stft_routine(ans[t + sr_str], sr)
-                    ans[t + "_mag" + sr_str] = mag
-                    if t == "input":
-                        ans[t + "_phase" + sr_str] = phase
+                # Zero-padding if audio clip is shorter than AUDIO_CLIP_LENGTH seconds
+                ans["truth" + sr_str].resize((int(sr * clip_length), ), refcheck=False)
+                ans["ref" + sr_str].resize((int(sr * clip_length), ), refcheck=False)
+                ans["leak" + sr_str].resize((int(sr * clip_length), ), refcheck=False)
 
-        save_content(SR, "")
-        if SAVE_16K:
-            save_content(16000, "_16k")
-        if sync_for_u_net:
-            save_content(8192, "_8k")
-        answers.append(ans)
+                # Input is not mixed now, as we want to mix it with multiple SNRs later when testing.
+                # ans["input" + sr_str], _, _ =\
+                # mix_on_given_snr(ans["snr"], ans["truth" + sr_str], ans["leak" + sr_str])
+                if ADD_NOISE:
+                    if ans["noise" + sr_str].size < ans["truth" + sr_str].size:
+                        # If the noise is not long enough we repeat it.
+                        rep_times = ans["truth" + sr_str].size // ans["noise" + sr_str].size + 1
+                        ans["noise" + sr_str] = np.tile(ans["noise" + sr_str], rep_times)
+                    # Then if noise is longer, chop it
+                    ans["noise" + sr_str] = np.resize(ans["noise" + sr_str], ans["truth" + sr_str].shape)
+                    # ans["input" + sr_str], _, _ = \
+                    #     mix_on_given_snr(ans["noise_snr"], ans["input" + sr_str], ans["noise" + sr_str])
+
+                # if save_spectrogram:
+                #     for t in ["truth", "ref", "input"]:
+                #         mag, phase = stft_routine(ans[t + sr_str], sr)
+                #         ans[t + "_mag" + sr_str] = mag
+                #         if t == "input":
+                #             ans[t + "_phase" + sr_str] = phase
+
+            save_content(SR, "")
+            if SAVE_16K:
+                save_content(16000, "_16k")
+            if sync_for_u_net:
+                save_content(8192, "_8k")
+            answers.append(ans)
+            i += clip_hop
 
     else:
         # for i in range(0, temp["truth"].size // SR - AUDIO_CLIP_HOP, AUDIO_CLIP_HOP):
@@ -328,7 +339,7 @@ if __name__ == '__main__':
     del targets
 
     # Clean dirs
-    for t, d in DIRS.values():
+    for t, d in DIRS.items():
         # Clean up regular content
         try:
             os.mkdir(d)
@@ -384,5 +395,6 @@ if __name__ == '__main__':
                               {"clip_length": 12.1, "clip_hop": 12.1/2, "sync_for_u_net": True})
         else:
             print("Test data, regular and u-net use same setup")
-            sync_and_save(DIRS[t], data_lists[t], {"sync_for_u_net": for_u_net})
+            sync_and_save(DIRS[t], data_lists[t],
+                          {"clip_length": 30, "clip_hop": 30, "sync_for_u_net": for_u_net})
 
