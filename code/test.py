@@ -190,6 +190,8 @@ if __name__ == "__main__":
 
 
         def get_metric(wav):
+            if abs(wav.size - truth_wav.size) > 10000:
+                raise ValueError("Audio lengths do not match.")
             if wav.size > truth_wav.size:
                 wav.resize(truth_wav.shape)
             elif wav.size < truth_wav.size:

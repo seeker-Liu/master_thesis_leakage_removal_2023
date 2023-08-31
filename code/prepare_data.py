@@ -188,7 +188,7 @@ def sync_audio(data_type: str,
         temp["truth_8k"] = librosa.resample(temp["truth"], orig_sr=SR, target_sr=8192)
         temp["leak_8k"] = librosa.resample(temp["leak"], orig_sr=SR, target_sr=8192)
         temp["leak_convoluted_8k"] = librosa.resample(temp["leak_convoluted"], orig_sr=SR, target_sr=8192)
-    elif SAVE_16K:
+    if SAVE_16K and (not sync_for_u_net or data_type == "test"):
         temp["truth_16k"] = librosa.resample(temp["truth"], orig_sr=SR, target_sr=16000)
         temp["leak_16k"] = librosa.resample(temp["leak"], orig_sr=SR, target_sr=16000)
         temp["leak_convoluted_16k"] = librosa.resample(temp["leak_convoluted"], orig_sr=SR, target_sr=16000)
@@ -202,7 +202,7 @@ def sync_audio(data_type: str,
             ans["noise"] = random.choice(noises).copy()
             if sync_for_u_net:
                 ans["noise_8k"] = librosa.resample(ans["noise"], orig_sr=SR, target_sr=8192)
-            elif SAVE_16K:
+            if SAVE_16K:
                 ans["noise_16k"] = librosa.resample(ans["noise"], orig_sr=SR, target_sr=16000)
             ans["noise_snr"] = get_random_noise_snr()
 
@@ -224,7 +224,10 @@ def sync_audio(data_type: str,
 
             if save_spectrogram:
                 for t in ["truth", "ref", "input"]:
-                    ans[t + "_mag" + sr_str], ans[t + "_phase" + sr_str] = stft_routine(ans[t + sr_str], sr)
+                    mag, phase = stft_routine(ans[t + sr_str], sr)
+                    ans[t + "_mag" + sr_str] = mag
+                    if t == "input":
+                        ans[t + "_phase" + sr_str] = phase
 
         save_content(SR, "")
         if SAVE_16K:
@@ -325,7 +328,7 @@ if __name__ == '__main__':
     del targets
 
     # Clean dirs
-    for d in DIRS.values():
+    for t, d in DIRS.values():
         # Clean up regular content
         try:
             os.mkdir(d)
@@ -338,11 +341,12 @@ if __name__ == '__main__':
             except FileNotFoundError:
                 pass
             os.mkdir(path)
-        if for_regular:
-            regular_dir = os.path.join(d, "regular")
-            clean_dir(regular_dir)
-        if for_u_net:
-            clean_dir(os.path.join(d, "u_net"))
+        if t != "test":
+            if for_regular:
+                regular_dir = os.path.join(d, "regular")
+                clean_dir(regular_dir)
+            if for_u_net:
+                clean_dir(os.path.join(d, "u_net"))
 
     # Set-up IRs
     print("Setting up IRs' data")
@@ -380,5 +384,5 @@ if __name__ == '__main__':
                               {"clip_length": 12.1, "clip_hop": 12.1/2, "sync_for_u_net": True})
         else:
             print("Test data, regular and u-net use same setup")
-            sync_and_save(DIRS[t], data_lists[t], {})
+            sync_and_save(DIRS[t], data_lists[t], {"sync_for_u_net": for_u_net})
 
