@@ -15,12 +15,14 @@ from u_net.u_net import u_net
 if __name__ == "__main__":
     no_gpu = False
     continue_train = False
-    target = "original"  # "original", "baseline" or "wave-u-net"
+    target = "None"  # "original", "baseline", "u-net" or "wave-u-net"
     for arg in sys.argv[1:]:
         if arg == "--no-gpu":
             no_gpu = True
-        elif arg == "-c" or arg == "--continue" or arg == "--rnn":
+        elif arg == "-c" or arg == "--continue":
             continue_train = True
+        elif arg == "--rnn" or arg == "--original":
+            target = "original"
         elif arg == "-b" or arg == "--baseline" or arg == "--fullsubnet":
             target = "baseline"
         elif arg == "--wave-u-net":

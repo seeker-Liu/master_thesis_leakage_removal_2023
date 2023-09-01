@@ -1,5 +1,5 @@
 ## Dataset preparation
-You should download the dataset from [urlhere] and unzip the dataset folder to the root directory of repository.
+You should download the dataset from [https://drive.google.com/file/d/1OTYIgD9lM3WkYaUWCMCDBvTyHXsGRnd-/view?usp=sharing] and unzip the dataset folder to the root directory of repository.
 
 Then, run the following code to prepare all data needed.
 ```shell
