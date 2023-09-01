@@ -19,9 +19,9 @@ if __name__ == "__main__":
     for arg in sys.argv[1:]:
         if arg == "--no-gpu":
             no_gpu = True
-        elif arg == "-c" or arg == "--continue":
+        elif arg == "-c" or arg == "--continue" or arg == "--rnn":
             continue_train = True
-        elif arg == "-b" or arg == "--baseline":
+        elif arg == "-b" or arg == "--baseline" or arg == "--fullsubnet":
             target = "baseline"
         elif arg == "--wave-u-net":
             target = "wave-u-net"
@@ -40,6 +40,10 @@ if __name__ == "__main__":
         physical_devices = tf.config.list_physical_devices('GPU')
         # tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
+    try:
+        os.mkdir(MODEL_DIR)
+    except FileExistsError:
+        pass
     model_dir = MODEL_DIRS[target]
     try:
         os.mkdir(model_dir)

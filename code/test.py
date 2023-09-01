@@ -137,9 +137,9 @@ if __name__ == "__main__":
     for arg in sys.argv[1:]:
         if arg == "--no-gpu":
             no_gpu = True
-        elif arg == "--original":
+        elif arg == "--original" or arg == "--rnn":
             target = "original"
-        elif arg == "--baseline":
+        elif arg == "--baseline" or arg == "--fullsubnet":
             target = "baseline"
         elif arg == "--wave-u-net":
             target = "wave-u-net"
@@ -272,7 +272,6 @@ if __name__ == "__main__":
         #     pass
         # os.mkdir(output_dir)
 
-    # print(f"Average SI-SDR of tested algo: {np.mean(algo_sdrs)}")
     algo_sdrs = np.array(algo_sdrs)
     np.save(os.path.join(output_dir, "SDRMatrix.npy"), algo_sdrs)
     process_times = np.array(process_times)

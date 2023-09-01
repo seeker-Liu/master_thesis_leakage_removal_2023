@@ -301,11 +301,7 @@ TSWLatexianTemp*
 
 /dataset/
 /data/
-/model/
-/wave_u_net_model/
-/wave_u_net_baseline_model/
-/u_net_baseline_model/
-/u_net_model/
-/baseline_model/
+/models/
 /.idea/
 **__pycache__**
+dataset.zip

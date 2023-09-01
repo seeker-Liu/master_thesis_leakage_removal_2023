@@ -10,15 +10,16 @@ DATA_DIR = os.path.join(ROOT_DIR, "data")
 TRAIN_DIR = os.path.join(DATA_DIR, "train")
 VALID_DIR = os.path.join(DATA_DIR, "validation")
 TEST_DIR = os.path.join(DATA_DIR, "test")
-MODEL_DIR = os.path.join(ROOT_DIR, "model")
-BASELINE_MODEL_DIR = os.path.join(ROOT_DIR, "baseline_model")
-WAVE_U_NET_MODEL_DIR = os.path.join(ROOT_DIR, "wave_u_net_model")
-WAVE_U_NET_BASELINE_MODEL_DIR = os.path.join(ROOT_DIR, "wave_u_net_baseline_model")
-U_NET_MODEL_DIR = os.path.join(ROOT_DIR, "u_net_model")
-U_NET_BASELINE_MODEL_DIR = os.path.join(ROOT_DIR, "u_net_baseline_model")
+MODEL_DIR = os.path.join(ROOT_DIR, "models")
+ORIGINAL_MODEL_DIR = os.path.join(MODEL_DIR, "rnn_model")
+BASELINE_MODEL_DIR = os.path.join(MODEL_DIR, "fullsubnet_model")
+WAVE_U_NET_MODEL_DIR = os.path.join(MODEL_DIR, "wave_u_net_model")
+WAVE_U_NET_BASELINE_MODEL_DIR = os.path.join(MODEL_DIR, "wave_u_net_baseline_model")
+U_NET_MODEL_DIR = os.path.join(MODEL_DIR, "u_net_model")
+U_NET_BASELINE_MODEL_DIR = os.path.join(MODEL_DIR, "u_net_baseline_model")
 
 MODEL_DIRS = {
-    "original": MODEL_DIR,
+    "original": ORIGINAL_MODEL_DIR,
     "baseline": BASELINE_MODEL_DIR,
     "wave-u-net": WAVE_U_NET_MODEL_DIR,
     "wave-u-net-baseline": WAVE_U_NET_BASELINE_MODEL_DIR,
