@@ -285,7 +285,7 @@ def sync_audio(data_type: str,
                     for t in ["truth", "ref", "input"]:
                         mag, phase = stft_routine(ans[t + sr_str], sr)
                         ans[t + "_mag" + sr_str] = mag
-                        if t == "input":
+                        if t == "input" or t == "truth":
                             ans[t + "_phase" + sr_str] = phase
 
             if sync_for_u_net:
